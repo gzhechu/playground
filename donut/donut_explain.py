@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from manim import *
+import math
 
 # manim donut_explain.py DonutExplain -r1280,720 -pqm
 # manim donut_explain.py DonutExplain -r640,360 -pql
@@ -39,7 +40,7 @@ class Torus(Arc):
 class DonutExplain(ThreeDScene):
     def __init__(self, **kwargs):
         self.r1 = 1
-        self.r2 = 3
+        self.r2 = 2
         self.step = 36
         ThreeDScene.__init__(self, **kwargs)
 
@@ -47,20 +48,20 @@ class DonutExplain(ThreeDScene):
         axes = ThreeDAxes()
         self.add(axes)
         t1 = Torus(radius=self.r1)
-        t2 = Torus(radius=self.r1)
+        t1.set_stroke(opacity=0.5)
         rotate1 = Rotate(t1, angle=PI/2, axis=RIGHT,
                          about_point=ORIGIN, run_time=2)
-        # self.set_camera_orientation(phi=90 * DEGREES, theta=30*DEGREES)
-        # self.play(FadeIn(cbox))
-        self.add(t1, t2)
+        self.add(t1)
         self.wait(3)
-        self.move_camera(theta=-75*DEGREES, run_time=2)
+        self.move_camera(phi=75*DEGREES, theta=-105*DEGREES, run_time=3)
         self.wait(3)
-        self.move_camera(phi=60*DEGREES, run_time=2)
         self.play(rotate1)
+        self.move_camera(phi=90*DEGREES, theta=-90*DEGREES, run_time=3)
+        self.wait(3)
         self.play(t1.animate.shift(RIGHT*self.r2), run_time=2)
         self.wait(3)
         t = t1
+        self.move_camera(phi=75*DEGREES, theta=-105*DEGREES, run_time=2)
         self.begin_ambient_camera_rotation(rate=0.1)
         for i in range(self.step):
             t = t1.copy()
@@ -68,5 +69,14 @@ class DonutExplain(ThreeDScene):
                             axis=OUT, about_point=ORIGIN)
             self.play(rotate, run_time=0.1)
             t1 = t
-        self.move_camera(phi=75*DEGREES, theta=-105*DEGREES, run_time=2)
-        self.wait(10)
+
+            if 0 == i % 3:
+                h = math.cos(i/self.step * TAU)
+                g = math.sin(i/self.step * TAU)
+                t2 = Torus(radius=self.r2 + g)
+                t2.set_stroke(color=BLUE, opacity=0.6)
+                t2.shift(OUT*h)
+                self.add(t2)
+        self.wait(5)
+        self.move_camera(phi=45*DEGREES, run_time=2)
+        self.wait(5)
