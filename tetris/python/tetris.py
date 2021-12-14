@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import random
 from enum import Enum
@@ -7,8 +8,8 @@ from tkinter import Tk, Frame, Canvas, ALL, NW
 BOARD_WIDTH = 720
 BOARD_HEIGHT = 720
 DELAY = 600
-STEP = 30
-SIDE = 28
+STEP = 6
+SIDE = 5
 
 
 ZONE_WIDTH = 12
@@ -215,25 +216,13 @@ class GameView(Canvas):
             self.delete(dot)
         if save:
             tag = "save"
-        for i in range(4):
-            for j in range(4):
-                if (0 != s[i][j]):
-                    self.draw_tile(x + j, y + i, self.color, tag)
-
-    def rotate_tetris(self):
-        if self.tetris.rotate():
-            dots = self.find_withtag("move")
-            s = T[self.tetris.tetris_num][self.tetris.shape_num]
-            for dot in dots:
-                self.delete(dot)
-            self.draw_shape(self.tetris.moveX, self.tetris.moveY, self.color,
-                            T[self.tetris.tetris_num][self.tetris.shape_num], "move")
+        self.draw_shape(x, y, self.color, s, tag)
 
     def on_key_pressed(self, e):
         if not self.tetris.inGame:
             return
         key = e.keysym
-        print("pressed", key)
+        # print("pressed", key)
 
         PAUSE_CURSOR_KEY = ["p", "P"]
         if key in PAUSE_CURSOR_KEY:
@@ -253,8 +242,8 @@ class GameView(Canvas):
             self.move_shape()
 
         UP_CURSOR_KEY = ["Up", "j", "J", "e", "E"]
-        if key in UP_CURSOR_KEY:
-            self.rotate_tetris()
+        if key in UP_CURSOR_KEY and self.tetris.rotate():
+            self.move_shape()
 
         ESCAPE_CURSOR_KEY = "Escape"
         if key == ESCAPE_CURSOR_KEY:
@@ -301,7 +290,7 @@ class GameView(Canvas):
             i -= 1
 
     def on_timer(self):
-        print("on_timer", self.color, self.next_color, self.tetris.next_tetris)
+        # print("on_timer", self.color, self.next_color, self.tetris.next_tetris)
         self.draw_score()
         if self.tetris.inGame:
             if not self.tetris.pause_move:
