@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import random
+import copy
 from enum import Enum
 from tkinter import Tk, Frame, Canvas, ALL
 
@@ -90,7 +91,11 @@ class TetrisModel():
     def new_tetris(self):
         self.tetris_num = self.next_tetris
         self.next_tetris = random.randint(0, len(T)-1)
-        self.moveX = int(self.width / 2 - 2)
+
+        solve = self.solve()  # 尝试解题
+        self.moveX = solve[1]
+        self.shape_num = solve[3]
+        # self.moveX = int(self.width / 2 - 2)
         self.moveY = 0
 
     def collision(self, x: int, y: int, num=None):
@@ -108,19 +113,21 @@ class TetrisModel():
         return False
 
     def move(self, d: Direction):
+        ret = False
         if d == Direction.LEFT:
             if not self.collision(self.moveX-1, self.moveY):
                 self.moveX -= 1
-                return True
+                ret = True
         elif d == Direction.RIGTHT:
             if not self.collision(self.moveX+1, self.moveY):
                 self.moveX += 1
-                return True
+                ret = True
         elif d == Direction.DOWN:
             if not self.collision(self.moveX, self.moveY+1):
                 self.moveY += 1
-                return True
-        return False
+                ret = True
+        # print("x={}, y={}".format(self.moveX, self.moveY))
+        return ret
 
     def rotate(self):
         rotate = False
@@ -171,10 +178,165 @@ class TetrisModel():
         i = self.height - 1
         while i > 0:
             if self.melt_detect(i):
-                print("try_melt", i, self.game_zone[i])
+                # print("try_melt", i, self.game_zone[i])
                 self.melt_it(i)
                 i += +1
             i -= 1
+
+    def evaluate(self):
+        """评价函数，评价游戏区域的分值，用于搜索最优解答"""
+        # 01 垂直检测空心悬空的列
+        # 02 计算留空的区块数，一般在消融后计算计算
+        # 03 检测堆积的高度以及分布
+        solid = self.width
+        space = 0
+        top = 22
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            for y in range(self.height):
+                if self.game_zone[y][x + 2] > 0:
+                    if top > y:
+                        top = y
+                    cnt += 1
+                    if mark == 0:
+                        mark = y
+                else:
+                    space += 1
+            if cnt == 0:  # 本列没有方块，不用计算。
+                continue
+            if cnt != self.height - mark:
+                solid -= 1
+            # print("x {} cnt {} mark {} solid {}".format(x, cnt, mark, solid))
+        # print("x {} y {} i {} solid {} top {}".format(
+        #     self.moveX, self.moveY, self.shape_num, solid, top))
+        y = self.moveY  # 找到最低点
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            cnt = 0
+            for j in range(4):
+                if 0 != s[i][j]:
+                    cnt += 1
+            if cnt == 0:
+                y += 1
+        return [solid * 100 + y, self.moveX, self.moveY, self.shape_num]
+
+    def evaluate2(self):
+        solid = self.width
+        space = 0
+        top = 22
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            for y in range(self.height):
+                if self.game_zone[y][x + 2] > 0:
+                    if top > y:
+                        top = y
+                    cnt += 1
+                    if mark == 0:
+                        mark = y
+                else:
+                    space += 1
+            if cnt == 0:  # 本列没有方块，不用计算。
+                continue
+            if cnt != self.height - mark:
+                solid -= 1
+
+        y = self.moveY  # 找到最低点
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            cnt = 0
+            for j in range(4):
+                if 0 != s[i][j]:
+                    cnt += 1
+            if cnt == 0:
+                y += 1
+
+            # print("x {} cnt {} mark {} solid {}".format(x, cnt, mark, solid))
+        # print("x {} y {} i {} solid {} top {}".format(
+        #     self.moveX, self.moveY, self.shape_num, solid, top))
+        return [solid * 100 + y + top/100, self.moveX, self.moveY, self.shape_num]
+
+    def evaluate3(self):
+        solid = self.width
+        space = 0
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            headroom = True
+            for y in range(self.height):
+                if self.game_zone[y][x + 2] > 0:
+                    headroom = False
+                    cnt += 1
+                    if mark == 0:
+                        mark = y
+                if headroom:
+                    space += 1
+                else:
+                    continue
+                # print(x, y, headroom, space)
+            if cnt == 0:  # 本列没有方块，不用计算。
+                continue
+            if cnt != self.height - mark:
+                solid -= 1
+
+        y1 = y2 = self.moveY  # 找到最低点
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            cnt = 0
+            for j in range(4):
+                if 0 != s[i][j]:
+                    cnt += 1
+            if cnt == 0:
+                y1 += 1
+            else:
+                y2 += cnt
+
+        # print("x {} y {} i {} solid {} space {} y1 {} y2 {}".format(
+        #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2))
+        return [solid * 100000 + space * 100 + y1 + y2, self.moveX, self.moveY, self.shape_num]
+
+    def solve(self):
+        x = -2
+        y = 0
+        idx = 0
+        possible = []
+        for x in range(-2, 11, 1):
+            for idx in range(4):
+                if self.collision(x, y, idx):  # 放不下
+                    continue
+                self.moveX = x
+                self.moveY = y
+                self.shape_num = idx
+                while self.move(Direction.DOWN):
+                    pass
+
+                # print("x {} y {} i {}".format(x, self.moveY, idx))
+                possible.append([x, self.moveY, idx])
+
+        # print("length possible {}".format(len(possible)))
+
+        answers = []
+        for xyz in possible:
+            x = xyz[0]
+            y = xyz[1]
+            idx = xyz[2]
+            t = copy.deepcopy(self)
+            t.moveX = x
+            t.moveY = y
+            t.shape_num = idx
+            t.save()
+            t.try_melt()
+            r = t.evaluate3()  # 评价函数
+            answers.append(r)
+        # print(answers)
+        # print("length answers {}".format(len(answers)))
+        answers = sorted(answers, key=lambda x: x[0], reverse=True)
+        solve = answers[0]
+        # print("0", answers[0])
+        # print("1", answers[1])
+        # print("2", answers[2])
+        return solve
 
 
 class GameView(Canvas):
@@ -185,6 +347,8 @@ class GameView(Canvas):
         self.nextY = NEXT_Y
 
         self.create_text(30, 10, text="Score: 0", tag="score", fill="white")
+        self.create_text(60, 60, text="X: 0, Y: 0 I: 0",
+                         tag="xyz", fill="white")
         self.create_rectangle(ZONE_LEFT_PX, ZONE_TOP_PX, ZONE_LEFT_PX + ZONE_WIDTH * STEP,
                               ZONE_TOP_PX + ZONE_HEIGHT * STEP,
                               fill="#0f0f0f", width=0, tag="zone")
@@ -210,7 +374,7 @@ class GameView(Canvas):
     def melt_tile(self, n):
         tag = "save"
         tiles = self.find_withtag(tag)
-        print("melt_tile", n, len(tiles))
+        # print("melt_tile", n, len(tiles))
         for tile in tiles:
             c = self.coords(tile)
             if c[1] == n*STEP+ZONE_TOP_PX:
@@ -218,9 +382,11 @@ class GameView(Canvas):
             if c[1] < n*STEP+ZONE_TOP_PX:
                 self.move(tile, 0, STEP)
 
-    def draw_score(self, s):
+    def draw_score(self, s, x, y, i):
         score = self.find_withtag("score")
-        self.itemconfigure(score, text="score: {0}".format(s))
+        self.itemconfigure(score, text="Score: {0}".format(s))
+        xyz = self.find_withtag("xyz")
+        self.itemconfigure(xyz, text="X: {0}, Y: {1} I: {2}".format(x, y, i))
 
     def game_over(self, score):
         '''删除画布上的所有信息，并显示游戏结束'''
@@ -241,6 +407,16 @@ class GameController():
         self.nextY = 1
         self.new_tetris()
 
+    def update(self, save=False):
+        if save:
+            self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
+                                    T[self._model.tetris_num][self._model.shape_num], "move", save=True)
+        else:
+            self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
+                                    T[self._model.tetris_num][self._model.shape_num], "move")
+        self._view.draw_score(self.score, self._model.moveX,
+                              self._model.moveY, self._model.shape_num)
+
     def on_key_pressed(self, e):
         if not self._model.in_game:
             return
@@ -250,26 +426,23 @@ class GameController():
         PAUSE_CURSOR_KEY = ["p", "P"]
         if key in PAUSE_CURSOR_KEY:
             self._model.pause_move = not self._model.pause_move
-            print("pause_move", self.pause_move)
+            # print("pause_move", self._model.pause_move)
 
         LEFT_CURSOR_KEY = ["Left", "s", "S"]
         if key in LEFT_CURSOR_KEY and self._model.move(Direction.LEFT):
-            self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
-                                    T[self._model.tetris_num][self._model.shape_num], "move")
+            self.update()
 
         RIGHT_CURSOR_KEY = ["Right", "f", "F"]
         if key in RIGHT_CURSOR_KEY and self._model.move(Direction.RIGTHT):
-            self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
-                                    T[self._model.tetris_num][self._model.shape_num], "move")
+            self.update()
 
         DOWN_CURSOR_KEY = ["Down", "d", "D"]
         if key in DOWN_CURSOR_KEY and self._model.move(Direction.DOWN):
-            self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
-                                    T[self._model.tetris_num][self._model.shape_num], "move")
+            self.update()
+
         UP_CURSOR_KEY = ["Up", "j", "J", "e", "E"]
         if key in UP_CURSOR_KEY and self._model.rotate():
-            self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
-                                    T[self._model.tetris_num][self._model.shape_num], "move")
+            self.update()
 
         ESCAPE_CURSOR_KEY = "Escape"
         if key == ESCAPE_CURSOR_KEY:
@@ -278,21 +451,18 @@ class GameController():
         SPACE_CURSOR_KEY = "space"
         if key == SPACE_CURSOR_KEY:
             while self._model.move(Direction.DOWN):
-                self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
-                                        T[self._model.tetris_num][self._model.shape_num], "move")
+                self.update()
 
     def on_timer(self):
-        # print("on_timer", self.color, self.next_color, self.tetris.next_tetris)
-        self._view.draw_score(self.score)
         if self._model.in_game:
             if not self._model.pause_move:
-                if self._model.move(Direction.DOWN):
-                    self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
-                                            T[self._model.tetris_num][self._model.shape_num], "move")
+                while self._model.move(Direction.DOWN):
+                    self.update()
                 else:
-                    self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
-                                            T[self._model.tetris_num][self._model.shape_num], "move", save=True)
+                    self.update(save=True)
                     self._model.save()
+                    # print("evaluate")
+                    # self._model.evaluate()  # 评估得分
                     self.try_melt()
                     self.new_tetris()
             self._view.after(DELAY, self.on_timer)
@@ -312,7 +482,7 @@ class GameController():
         i = ZONE_HEIGHT-1
         while i > 0:
             if self._model.melt_detect(i):
-                print("try_melt", i, self._model.game_zone[i])
+                # print("try_melt", i, self._model.game_zone[i])
                 self._model.melt_it(i)
                 self._view.melt_tile(i)
                 self.score += 1
