@@ -8,7 +8,7 @@ from tkinter import Tk, Frame, Canvas, ALL
 
 BOARD_WIDTH = 720
 BOARD_HEIGHT = 720
-DELAY = 600
+DELAY = 10
 STEP = 30
 SIDE = 28
 
@@ -183,103 +183,31 @@ class TetrisModel():
                 i += +1
             i -= 1
 
-    def evaluate(self):
+    def evaluate1(self):
         """评价函数，评价游戏区域的分值，用于搜索最优解答"""
         # 01 垂直检测空心悬空的列
         # 02 计算留空的区块数，一般在消融后计算计算
         # 03 检测堆积的高度以及分布
         solid = self.width
         space = 0
-        top = 22
         for x in range(self.width):
             mark = 0
             cnt = 0
+            clearance = True
             for y in range(self.height):
                 if self.game_zone[y][x + 2] > 0:
-                    if top > y:
-                        top = y
+                    clearance = False
                     cnt += 1
                     if mark == 0:
                         mark = y
-                else:
-                    space += 1
-            if cnt == 0:  # 本列没有方块，不用计算。
-                continue
-            if cnt != self.height - mark:
-                solid -= 1
-            # print("x {} cnt {} mark {} solid {}".format(x, cnt, mark, solid))
-        # print("x {} y {} i {} solid {} top {}".format(
-        #     self.moveX, self.moveY, self.shape_num, solid, top))
-        y = self.moveY  # 找到最低点
-        s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            cnt = 0
-            for j in range(4):
-                if 0 != s[i][j]:
-                    cnt += 1
-            if cnt == 0:
-                y += 1
-        return [solid * 100 + y, self.moveX, self.moveY, self.shape_num]
-
-    def evaluate2(self):
-        solid = self.width
-        space = 0
-        top = 22
-        for x in range(self.width):
-            mark = 0
-            cnt = 0
-            for y in range(self.height):
-                if self.game_zone[y][x + 2] > 0:
-                    if top > y:
-                        top = y
-                    cnt += 1
-                    if mark == 0:
-                        mark = y
-                else:
-                    space += 1
-            if cnt == 0:  # 本列没有方块，不用计算。
-                continue
-            if cnt != self.height - mark:
-                solid -= 1
-
-        y = self.moveY  # 找到最低点
-        s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            cnt = 0
-            for j in range(4):
-                if 0 != s[i][j]:
-                    cnt += 1
-            if cnt == 0:
-                y += 1
-
-            # print("x {} cnt {} mark {} solid {}".format(x, cnt, mark, solid))
-        # print("x {} y {} i {} solid {} top {}".format(
-        #     self.moveX, self.moveY, self.shape_num, solid, top))
-        return [solid * 100 + y + top/100, self.moveX, self.moveY, self.shape_num]
-
-    def evaluate3(self):
-        solid = self.width
-        space = 0
-        for x in range(self.width):
-            mark = 0
-            cnt = 0
-            headroom = True
-            for y in range(self.height):
-                if self.game_zone[y][x + 2] > 0:
-                    headroom = False
-                    cnt += 1
-                    if mark == 0:
-                        mark = y
-                if headroom:
+                if clearance:
                     space += 1
                 else:
                     continue
-                # print(x, y, headroom, space)
             if cnt == 0:  # 本列没有方块，不用计算。
                 continue
             if cnt != self.height - mark:
                 solid -= 1
-
         y1 = y2 = self.moveY  # 找到最低点
         s = T[self.tetris_num][self.shape_num]
         for i in range(4):
@@ -292,9 +220,146 @@ class TetrisModel():
             else:
                 y2 += cnt
 
-        # print("x {} y {} i {} solid {} space {} y1 {} y2 {}".format(
-        #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2))
-        return [solid * 100000 + space * 100 + y1 + y2, self.moveX, self.moveY, self.shape_num]
+        print("x {} y {} i {} solid {} space {} y1 {} y2 {}".format(
+            self.moveX, self.moveY, self.shape_num, solid, space, y1, y2))
+
+        # return [solid * 100 + y, self.moveX, self.moveY, self.shape_num]
+        return [space*10 + y1 + y2, self.moveX, self.moveY, self.shape_num]
+
+    def evaluate2(self):
+        solid = self.width
+        space = 0
+        hangs = 0
+        holes = 0
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            clearance = True
+            for y in range(self.height):
+                if self.game_zone[y][x + 2] > 0:
+                    clearance = False
+                    cnt += 1
+                    if mark == 0:
+                        mark = y
+                if clearance:
+                    space += 1
+                else:
+                    continue
+            if cnt == 0:  # 本列没有方块，不用计算。
+                continue
+            if cnt != self.height - mark:
+                solid -= 1
+            holes += self.height - mark - cnt  # 洞
+        y1 = y2 = self.moveY  # 找到最低点
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            cnt = 0
+            for j in range(4):
+                if 0 != s[i][j]:
+                    cnt += 1
+            if cnt == 0:
+                y1 += 1
+            else:
+                y2 += cnt
+
+        print("x {} y {} i {} solid {} space {} y1 {} y2 {} holes {}".format(
+            self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, holes))
+
+        # return [space*10 + y1 + y2, self.moveX, self.moveY, self.shape_num]
+        return [space + y1 + y2 - holes*5, self.moveX, self.moveY, self.shape_num]
+
+    def evaluate3(self):
+        """评价函数"""
+        solid = self.width
+        space = 0
+        holes = 0
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            clearance = True
+            for y in range(self.height):
+                if self.game_zone[y][x + 2] > 0:
+                    clearance = False
+                    cnt += 1
+                    if mark == 0:
+                        mark = y
+                if clearance:
+                    space += 1
+                else:
+                    continue
+            if cnt == 0:  # 本列没有方块，不用计算。
+                continue
+            if cnt != self.height - mark:
+                solid -= 1
+            holes += self.height - mark - cnt  # 洞
+        aspect = 1  # 形状高宽比
+        w = [0, 0, 0, 0]
+        h = [0, 0, 0, 0]
+        y1 = y2 = self.moveY  # 找到最低点
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            cnt = 0
+            for j in range(4):
+                if 0 != s[i][j]:
+                    w[j] = 1
+                    h[i] = 1
+                    cnt += 1
+            if cnt == 0:
+                y1 += 1
+            else:
+                y2 += cnt
+        aspect = sum(w)/sum(h)
+        print("x {} y {} i {} solid {} space {} y1 {} y2 {} holes {} aspect {}".format(
+            self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, holes, aspect))
+
+        return [space + y1 + y2 - holes*6, self.moveX, self.moveY, self.shape_num]
+        # return [solid * 100000 + space * 100 + y1 + y2, self.moveX, self.moveY, self.shape_num]
+
+    def evaluate4(self):
+        solid = self.width
+        space = 0
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            clearance = True
+            for y in range(self.height):
+                if self.game_zone[y][x + 2] > 0:
+                    clearance = False
+                    cnt += 1
+                    if mark == 0:
+                        mark = y
+                if clearance:
+                    space += 1
+                else:
+                    continue
+                # print(x, y, clearance , space)
+            if cnt == 0:  # 本列没有方块，不用计算。
+                continue
+            if cnt != self.height - mark:
+                solid -= 1
+
+        aspect = 1  # 形状高宽比
+        w = [0, 0, 0, 0]
+        h = [0, 0, 0, 0]
+        y1 = y2 = self.moveY  # 找到最低点
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            cnt = 0
+            for j in range(4):
+                if 0 != s[i][j]:
+                    cnt += 1
+                    w[j] = 1
+                    h[i] = 1
+            if cnt == 0:
+                y1 += 1
+            else:
+                y2 += cnt
+
+        aspect = int(sum(w)/sum(h))
+
+        print("x {} y {} i {} solid {} space {} y1 {} y2 {} aspect {}".format(
+            self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, aspect))
+        return [solid * 100000 + space * 100 + y1 + y2 + aspect, self.moveX, self.moveY, self.shape_num]
 
     def solve(self):
         x = -2
@@ -329,13 +394,14 @@ class TetrisModel():
             t.try_melt()
             r = t.evaluate3()  # 评价函数
             answers.append(r)
-        # print(answers)
-        # print("length answers {}".format(len(answers)))
+
+        # for r in answers:
+        #     print(r)
         answers = sorted(answers, key=lambda x: x[0], reverse=True)
         solve = answers[0]
-        # print("0", answers[0])
-        # print("1", answers[1])
-        # print("2", answers[2])
+        print("0", answers[0])
+        print("1", answers[1])
+        print("2", answers[2])
         return solve
 
 
