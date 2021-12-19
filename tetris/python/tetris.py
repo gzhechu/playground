@@ -4,21 +4,21 @@
 import random
 import copy
 import math
+from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas, ALL
 
-BOARD_WIDTH = 720
-BOARD_HEIGHT = 720
 DELAY = 1
-STEP = 30
-SIDE = 28
+STEP = 28
+SIDE = 26
+BOARD_WIDTH = BOARD_HEIGHT = STEP * 24
 
 ZONE_WIDTH = 12
 ZONE_HEIGHT = 22
 NEXT_X = 14
 NEXT_Y = 1
 
-ZONE_TOP_PX = 30
+ZONE_TOP_PX = STEP
 ZONE_LEFT_PX = (BOARD_WIDTH-STEP*ZONE_WIDTH)/2
 
 
@@ -328,20 +328,14 @@ class TetrisModel():
         holes = 0
         hangs = 0  # 悬空
         narrow = 0  # 窄
-        narrow_mark = 0
-        for y in range(self.height):
-            if y >= narrow_mark + 4 and narrow_mark != 0:
-                break
+        for y in range(self.moveY, self.moveY+5):
+            # if y < self.moveY or y > self.moveY + 4:
+            #     continue
             for x in range(self.width):
-                if self.game_zone[y][x + 2] > 0:
-                    # print(x, y)
-                    pass
-                else:
+                if self.game_zone[y][x + 2] == 0:
                     if (self.game_zone[y][x + 1] > 0) and (self.game_zone[y][x + 3] > 0):
                         # print("narrow", x, y)
                         narrow += 1
-                        if narrow_mark == 0:
-                            narrow_mark = y
 
         for x in range(self.width):
             mark = 0
@@ -371,28 +365,22 @@ class TetrisModel():
                 solid -= 1
             holes += self.height - mark - cnt  # 洞
 
-        hollow = 12 - solid
-        aspect = 1  # 高宽比
-        w = [0, 0, 0, 0]
-        h = [0, 0, 0, 0]
         y1 = y2 = self.moveY  # 最低点
         s = T[self.tetris_num][self.shape_num]
         for i in range(4):
             cnt = 0
             for j in range(4):
                 if 0 != s[i][j]:
-                    w[j] = 1
-                    h[i] = 1
                     cnt += 1
             if cnt == 0:
                 y1 += 1
             else:
                 y2 += cnt
-        aspect = math.ceil(sum(w)/sum(h))
+
         # 评价系数
         # print("x {} y {} i {} solid {} space {} y1 {} y2 {} holes {} hangs {} narrow {}".format(
         #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, holes, hangs, narrow))
-        return [space + (y1 + y2)*6 - holes*12 - hangs - narrow*2, self.moveX, self.moveY, self.shape_num, holes, hangs, narrow]
+        return [space + (y1 + y2)*6 - holes*12 - hangs - narrow*4, self.moveX, self.moveY, self.shape_num, holes, hangs, narrow]
 
     def solve(self):
         x = -2
@@ -444,16 +432,18 @@ class GameView(Canvas):
         self.nextX = NEXT_X
         self.nextY = NEXT_Y
 
-        self.create_text(90, 90, text="Score: 0", tag="score",
-                         fill="white", font=("Arial", 25), justify='center')
-        self.create_text(90, 160, text="X: 0",
-                         tag="xxx", fill="white", font=("Arial", 20), justify='center')
-        self.create_text(90, 200, text="Y: 0",
-                         tag="yyy", fill="white", font=("Arial", 20), justify='center')
-        self.create_text(90, 240, text="T: 0",
-                         tag="ttt", fill="white", font=("Arial", 20), justify='center')
-        self.create_text(90, 280, text="I: 0",
-                         tag="iii", fill="white", font=("Arial", 20), justify='center')
+        self.create_text(SIDE*3, SIDE*2, text="01:23:45", tag="time",
+                         fill="white", font=("Arial", 5+SIDE//2), justify='center')
+        self.create_text(SIDE*3, SIDE*4, text="Score: 0", tag="score",
+                         fill="white", font=("Arial", 5+SIDE//2), justify='center')
+        self.create_text(SIDE*3, SIDE*6, text="X: 0",
+                         tag="xxx", fill="white", font=("Arial", 3+STEP//2), justify='center')
+        self.create_text(SIDE*3, SIDE*7, text="Y: 0",
+                         tag="yyy", fill="white", font=("Arial", 3+STEP//2), justify='center')
+        self.create_text(SIDE*3, SIDE*8, text="T: 0",
+                         tag="ttt", fill="white", font=("Arial", 3+STEP//2), justify='center')
+        self.create_text(SIDE*3, SIDE*9, text="I: 0",
+                         tag="iii", fill="white", font=("Arial", 3+STEP//2), justify='center')
         self.create_rectangle(ZONE_LEFT_PX, ZONE_TOP_PX, ZONE_LEFT_PX + ZONE_WIDTH * STEP,
                               ZONE_TOP_PX + ZONE_HEIGHT * STEP,
                               fill="#1f1f1f", width=0, tag="zone")
@@ -487,7 +477,9 @@ class GameView(Canvas):
             if c[1] < n*STEP+ZONE_TOP_PX:
                 self.move(tile, 0, STEP)
 
-    def draw_score(self, s, x, y, t, i):
+    def draw_score(self, dt, s, x, y, t, i):
+        tm = self.find_withtag("time")
+        self.itemconfigure(tm, text=dt)
         score = self.find_withtag("score")
         self.itemconfigure(score, text="Score: {0}".format(s))
         xxx = self.find_withtag("xxx")
@@ -516,6 +508,7 @@ class GameController():
         self.score = 0
         self.nextX = 13
         self.nextY = 1
+        self.start = datetime.now()
         self.new_tetris()
 
     def update(self, save=False):
@@ -525,7 +518,7 @@ class GameController():
         else:
             self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
                                     T[self._model.tetris_num][self._model.shape_num], "move")
-        self._view.draw_score(self.score, self._model.moveX,
+        self._view.draw_score(self.dt, self.score, self._model.moveX,
                               self._model.moveY, self._model.tetris_num, self._model.shape_num)
 
     def on_key_pressed(self, e):
@@ -566,6 +559,7 @@ class GameController():
 
     def on_timer(self):
         if self._model.in_game:
+            self.dt = str(datetime.now() - self.start).split(".")[0]
             if not self._model.pause_move:
                 if self._model.move(Direction.DOWN):
                     self.update()
@@ -606,10 +600,10 @@ class GameController():
         self._view.delete(ALL)
         self._view.create_text(self._view.winfo_width() / 2, self._view.winfo_height()/2,
                                text="Game Over with score {0}".format(self.score), fill="white")
-        self._view.after(1000, self._quit)
+        # self._view.after(1000, self._quit)
 
-    def _quit(self):
-        self._view.quit()
+    # def _quit(self):
+    #     self._view.quit()
 
 
 class TetrisGame(Frame):
