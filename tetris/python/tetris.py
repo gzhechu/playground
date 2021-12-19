@@ -9,7 +9,7 @@ from tkinter import Tk, Frame, Canvas, ALL
 
 BOARD_WIDTH = 720
 BOARD_HEIGHT = 720
-DELAY = 5
+DELAY = 1
 STEP = 30
 SIDE = 28
 
@@ -94,7 +94,7 @@ class TetrisModel():
         self.next_tetris = random.randint(0, len(T)-1)
 
         answer = self.solve()  # 尝试解题
-        print(answer)
+        # print(answer)
         self.moveX = answer[1]
         self.shape_num = answer[3]
         # self.moveX = int(self.width / 2 - 2)
@@ -274,7 +274,7 @@ class TetrisModel():
                 y2 += cnt
         aspect = math.ceil(sum(w)/sum(h))
         # 评价系数
-        return [ space + y1 + y2 - holes*12, self.moveX, self.moveY, self.shape_num]
+        return [space + y1 + y2 - holes*12, self.moveX, self.moveY, self.shape_num]
 
     def evaluate3(self):
         """评价函数"""
@@ -322,49 +322,77 @@ class TetrisModel():
         # return [solid * 100000 + space * 100 + y1 + y2, self.moveX, self.moveY, self.shape_num]
 
     def evaluate4(self):
+        """评价函数"""
         solid = self.width
         space = 0
+        holes = 0
+        hangs = 0  # 悬空
+        narrow = 0  # 窄
+        narrow_mark = 0
+        for y in range(self.height):
+            if y >= narrow_mark + 4 and narrow_mark != 0:
+                break
+            for x in range(self.width):
+                if self.game_zone[y][x + 2] > 0:
+                    # print(x, y)
+                    pass
+                else:
+                    if (self.game_zone[y][x + 1] > 0) and (self.game_zone[y][x + 3] > 0):
+                        # print("narrow", x, y)
+                        narrow += 1
+                        if narrow_mark == 0:
+                            narrow_mark = y
+
         for x in range(self.width):
             mark = 0
             cnt = 0
+            hang = 0
             clearance = True
             for y in range(self.height):
                 if self.game_zone[y][x + 2] > 0:
                     clearance = False
                     cnt += 1
+                    hang += 1
                     if mark == 0:
                         mark = y
+                else:
+                    if not clearance:
+                        hangs += hang
+                        hang = 0
                 if clearance:
                     space += 1
+                    pass
                 else:
-                    continue
-                # print(x, y, clearance , space)
+                    # space += 1
+                    pass
             if cnt == 0:  # 本列没有方块，不用计算。
                 continue
             if cnt != self.height - mark:
                 solid -= 1
+            holes += self.height - mark - cnt  # 洞
 
-        aspect = 1  # 高宽比系数
+        hollow = 12 - solid
+        aspect = 1  # 高宽比
         w = [0, 0, 0, 0]
         h = [0, 0, 0, 0]
-        y1 = y2 = self.moveY  # 低点
+        y1 = y2 = self.moveY  # 最低点
         s = T[self.tetris_num][self.shape_num]
         for i in range(4):
             cnt = 0
             for j in range(4):
                 if 0 != s[i][j]:
-                    cnt += 1
                     w[j] = 1
                     h[i] = 1
+                    cnt += 1
             if cnt == 0:
                 y1 += 1
             else:
                 y2 += cnt
-        aspect = math.ceil((sum(w)/sum(h)))
+        aspect = math.ceil(sum(w)/sum(h))
         # 评价系数
-        # print("x {} y {} i {} solid {} space {} y1 {} y2 {} aspect {}".format(
-        #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, aspect))
-        return [solid * 100000 + space * 100 + y1 + y2 + aspect, self.moveX, self.moveY, self.shape_num]
+        # print("x {} y {} i {} solid {} space {} y1 {} y2 {} holes {} hangs {} narrow {}".format(
+        #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, holes, hangs, narrow))
+        return [space + (y1 + y2)*6 - holes*12 - hangs - narrow*2, self.moveX, self.moveY, self.shape_num, holes, hangs, narrow]
 
     def solve(self):
         x = -2
@@ -380,7 +408,6 @@ class TetrisModel():
                 self.shape_num = idx
                 while self.move(Direction.DOWN):
                     pass
-
                 # print("x {} y {} i {}".format(x, self.moveY, idx))
                 possible.append([x, self.moveY, idx])
 
@@ -397,16 +424,16 @@ class TetrisModel():
             t.shape_num = idx
             t.save()
             t.try_melt()
-            r = t.evaluate2()  # 评价函数
+            r = t.evaluate4()  # 评价函数
             answers.append(r)
 
         # for r in answers:
         #     print(r)
         answers = sorted(answers, key=lambda x: x[0], reverse=True)
         solve = answers[0]
-        # print("0", answers[0])
-        # print("1", answers[1])
-        # print("2", answers[2])
+        print("0", answers[0])
+        print("1", answers[1])
+        print("2", answers[2])
         return solve
 
 
@@ -417,9 +444,16 @@ class GameView(Canvas):
         self.nextX = NEXT_X
         self.nextY = NEXT_Y
 
-        self.create_text(30, 10, text="Score: 0", tag="score", fill="white")
-        self.create_text(60, 60, text="X: 0, Y: 0 I: 0",
-                         tag="xyz", fill="white")
+        self.create_text(90, 90, text="Score: 0", tag="score",
+                         fill="white", font=("Arial", 25), justify='center')
+        self.create_text(90, 160, text="X: 0",
+                         tag="xxx", fill="white", font=("Arial", 20), justify='center')
+        self.create_text(90, 200, text="Y: 0",
+                         tag="yyy", fill="white", font=("Arial", 20), justify='center')
+        self.create_text(90, 240, text="T: 0",
+                         tag="ttt", fill="white", font=("Arial", 20), justify='center')
+        self.create_text(90, 280, text="I: 0",
+                         tag="iii", fill="white", font=("Arial", 20), justify='center')
         self.create_rectangle(ZONE_LEFT_PX, ZONE_TOP_PX, ZONE_LEFT_PX + ZONE_WIDTH * STEP,
                               ZONE_TOP_PX + ZONE_HEIGHT * STEP,
                               fill="#1f1f1f", width=0, tag="zone")
@@ -453,11 +487,17 @@ class GameView(Canvas):
             if c[1] < n*STEP+ZONE_TOP_PX:
                 self.move(tile, 0, STEP)
 
-    def draw_score(self, s, x, y, i):
+    def draw_score(self, s, x, y, t, i):
         score = self.find_withtag("score")
         self.itemconfigure(score, text="Score: {0}".format(s))
-        xyz = self.find_withtag("xyz")
-        self.itemconfigure(xyz, text="X: {0}, Y: {1} I: {2}".format(x, y, i))
+        xxx = self.find_withtag("xxx")
+        self.itemconfigure(xxx, text="X: {}".format(x+2))
+        yyy = self.find_withtag("yyy")
+        self.itemconfigure(yyy, text="Y: {}".format(y))
+        ttt = self.find_withtag("ttt")
+        self.itemconfigure(ttt, text="T: {}".format(t))
+        iii = self.find_withtag("iii")
+        self.itemconfigure(iii, text="I: {}".format(i))
 
     def game_over(self, score):
         '''删除画布上的所有信息，并显示游戏结束'''
@@ -486,7 +526,7 @@ class GameController():
             self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
                                     T[self._model.tetris_num][self._model.shape_num], "move")
         self._view.draw_score(self.score, self._model.moveX,
-                              self._model.moveY, self._model.shape_num)
+                              self._model.moveY, self._model.tetris_num, self._model.shape_num)
 
     def on_key_pressed(self, e):
         if not self._model.in_game:
@@ -529,6 +569,7 @@ class GameController():
             if not self._model.pause_move:
                 if self._model.move(Direction.DOWN):
                     self.update()
+                    pass
                 else:
                     self.update(save=True)
                     self._model.save()
