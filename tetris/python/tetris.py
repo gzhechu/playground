@@ -4,22 +4,22 @@
 import random
 import copy
 import math
+import sys
+import getopt
 from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas, ALL
 
-DELAY = 1
-STEP = 28
-SIDE = 26
-BOARD_WIDTH = BOARD_HEIGHT = STEP * 24
+STEP = 24  # 每次移动的步长
+SIDE = 22  # 绘制单个方块的变长，小于步长所以可以绘制出黑边
+BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  # 整个GUI窗体的宽和高
+DELAY = 300  # 每次下降的延迟等待毫秒
 
-ZONE_WIDTH = 12
-ZONE_HEIGHT = 22
-NEXT_X = 14
-NEXT_Y = 1
+ZONE_WIDTH = 12  # 降落区宽度
+ZONE_HEIGHT = 22  # 降落区高度
 
-ZONE_TOP_PX = STEP
-ZONE_LEFT_PX = (BOARD_WIDTH-STEP*ZONE_WIDTH)/2
+ZONE_TOP_PX = STEP  # 降落区的上边缘坐标
+ZONE_LEFT_PX = (BOARD_WIDTH-STEP*ZONE_WIDTH)/2  # 降落区的左上角坐标
 
 
 T = ((((0, 1, 0, 0), (0, 1, 0, 0), (0, 1, 1, 0), (0, 0, 0, 0)),  # L
@@ -92,12 +92,7 @@ class TetrisModel():
     def new_tetris(self):
         self.tetris_num = self.next_tetris
         self.next_tetris = random.randint(0, len(T)-1)
-
-        answer = self.solve()  # 尝试解题
-        # print(answer)
-        self.moveX = answer[1]
-        self.shape_num = answer[3]
-        # self.moveX = int(self.width / 2 - 2)
+        self.moveX = int(self.width / 2 - 2)
         self.moveY = 0
 
     def collision(self, x: int, y: int, num=None):
@@ -328,9 +323,9 @@ class TetrisModel():
         holes = 0
         hangs = 0  # 悬空
         narrow = 0  # 窄
-        for y in range(self.moveY, self.moveY+5):
-            # if y < self.moveY or y > self.moveY + 4:
-            #     continue
+        for y in range(self.moveY, self.height):
+            if y > self.moveY + 4:
+                continue
             for x in range(self.width):
                 if self.game_zone[y][x + 2] == 0:
                     if (self.game_zone[y][x + 1] > 0) and (self.game_zone[y][x + 3] > 0):
@@ -398,8 +393,7 @@ class TetrisModel():
                     pass
                 # print("x {} y {} i {}".format(x, self.moveY, idx))
                 possible.append([x, self.moveY, idx])
-
-        # print("length possible {}".format(len(possible)))
+        self.moveY = 0  # 恢复位置
 
         answers = []
         for xyz in possible:
@@ -415,23 +409,18 @@ class TetrisModel():
             r = t.evaluate4()  # 评价函数
             answers.append(r)
 
-        # for r in answers:
-        #     print(r)
         answers = sorted(answers, key=lambda x: x[0], reverse=True)
-        solve = answers[0]
-        print("0", answers[0])
-        print("1", answers[1])
-        print("2", answers[2])
-        return solve
+        answer = answers[0]
+        # print("0", answers[0])
+        # print("1", answers[1])
+        # print("2", answers[2])
+        return answer
 
 
 class GameView(Canvas):
     def __init__(self, w=BOARD_WIDTH, h=BOARD_HEIGHT):
         super().__init__(width=w, height=h,
                          background="black", highlightthickness=0)
-        self.nextX = NEXT_X
-        self.nextY = NEXT_Y
-
         self.create_text(SIDE*3, SIDE*2, text="01:23:45", tag="time",
                          fill="white", font=("Arial", 5+SIDE//2), justify='center')
         self.create_text(SIDE*3, SIDE*4, text="Score: 0", tag="score",
@@ -491,18 +480,19 @@ class GameView(Canvas):
         iii = self.find_withtag("iii")
         self.itemconfigure(iii, text="I: {}".format(i))
 
-    def game_over(self, score):
-        '''删除画布上的所有信息，并显示游戏结束'''
-        self.tetris.in_game = False
-        self.delete(ALL)
-        self.create_text(self.winfo_width() / 2, self.winfo_height()/2,
-                         text="Game Over with score {0}".format(score), fill="white")
+    # def game_over(self, score):
+    #     '''删除画布上的所有信息，并显示游戏结束'''
+    #     self.tetris.in_game = False
+    #     self.delete(ALL)
+    #     self.create_text(self.winfo_width() / 2, self.winfo_height()/2,
+    #                      text="Game Over with score {0}".format(score), fill="white")
 
 
 class GameController():
-    def __init__(self, model, view):
+    def __init__(self, model, view, ai=False):
         self._model = model
         self._view = view
+        self.ai = ai
         self.next_color = "lightblue"
         self.color = self.next_color
         self.score = 0
@@ -510,6 +500,9 @@ class GameController():
         self.nextY = 1
         self.start = datetime.now()
         self.new_tetris()
+        if self.ai:
+            global DELAY
+            DELAY = 3
 
     def update(self, save=False):
         if save:
@@ -567,10 +560,15 @@ class GameController():
                 else:
                     self.update(save=True)
                     self._model.save()
-                    # print("evaluate")
-                    # self._model.evaluate()  # 评估得分
                     self.try_melt()
                     self.new_tetris()
+                    if self.ai:  # 自动执行
+                        answer = self._model.solve()  # 尝试解题
+                        self._model.moveX = answer[1]
+                        self._model.shape_num = answer[3]
+                        print(self.dt, "score:", self.score,
+                              self._model.tetris_num, answer)
+
             self._view.after(DELAY, self.on_timer)
         else:
             self.game_over()
@@ -592,14 +590,15 @@ class GameController():
                 self._model.melt_it(i)
                 self._view.melt_tile(i)
                 self.score += 1
-                i += +1
+                i += 1
             i -= 1
 
     def game_over(self):
         self._model.in_game = False
-        self._view.delete(ALL)
-        self._view.create_text(self._view.winfo_width() / 2, self._view.winfo_height()/2,
-                               text="Game Over with score {0}".format(self.score), fill="white")
+        # self._view.delete(ALL)
+        self._view.create_text(self._view.winfo_width() / 2, self._view.winfo_height()/2-SIDE,
+                               text="Game Over with Score {0}.".format(self.score), fill="white",
+                               font=("Arial", 5+SIDE//2))
         # self._view.after(1000, self._quit)
 
     # def _quit(self):
@@ -607,23 +606,56 @@ class GameController():
 
 
 class TetrisGame(Frame):
-    def __init__(self):
+    def __init__(self, ai=False):
         super().__init__()
         self.master.title('TETRIS - 俄罗斯方块大作战')
         m = TetrisModel(ZONE_WIDTH, ZONE_HEIGHT)
         v = GameView()
-        c = GameController(m, v)
+        c = GameController(m, v, ai)
         v.bind_all("<Key>", c.on_key_pressed)
         v.after(DELAY, c.on_timer)
         self.board = v
         self.pack()
 
 
-def main():
+def main(ai=False):
     root = Tk()
-    nib = TetrisGame()
+    nib = TetrisGame(ai)
     root.mainloop()
 
 
+def verify():
+    # 验证模式，无GUI界面动画
+    score = 0
+    start = datetime.now()
+    m = TetrisModel(ZONE_WIDTH, ZONE_HEIGHT)
+    while m.in_game:
+        dt = str(datetime.now() - start).split(".")[0]
+        m.new_tetris()
+        answer = m.solve()  # 尝试解题
+        m.moveX = answer[1]
+        m.moveY = answer[2]
+        m.shape_num = answer[3]
+        m.save()
+        # m.try_melt() # 消分
+        i = ZONE_HEIGHT-1
+        while i > 0:
+            if m.melt_detect(i):
+                m.melt_it(i)
+                score += 1
+                i += 1
+            i -= 1
+        print(dt, "score:", score, m.tetris_num, answer)
+
+
 if __name__ == '__main__':
+    opts, args = getopt.getopt(
+        sys.argv[1:], '-v-a', ['verify', 'auto'])
+    for opt_name, opt_value in opts:
+        if opt_name in ('-v', '--verify'):
+            verify()
+            exit()
+        if opt_name in ('-a', '--auto'):
+            main(ai=True)
+            exit()
     main()
