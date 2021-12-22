@@ -10,16 +10,16 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas, ALL
 
-STEP = 24  # 每次移动的步长
-SIDE = 22  # 绘制单个方块的变长，小于步长所以可以绘制出黑边
-BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  # 整个GUI窗体的宽和高
-DELAY = 300  # 每次下降的延迟等待毫秒
+STEP = 6  # pixel
+SIDE = 5  #
+BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
+DELAY = 300  # micro second
 
-ZONE_WIDTH = 12  # 降落区宽度
-ZONE_HEIGHT = 22  # 降落区高度
+GRID_WIDTH = 10  # num
+GRID_HEIGHT = 20  #
 
-ZONE_TOP_PX = STEP  # 降落区的上边缘坐标
-ZONE_LEFT_PX = (BOARD_WIDTH-STEP*ZONE_WIDTH)/2  # 降落区的左上角坐标
+GRID_TOP = STEP*2  # pixel
+GRID_LEFT = (BOARD_WIDTH-STEP*GRID_WIDTH)/2  # pixel
 
 
 T = ((((0, 1, 0, 0), (0, 1, 0, 0), (0, 1, 1, 0), (0, 0, 0, 0)),  # L
@@ -63,23 +63,24 @@ class Direction(Enum):
 
 class TetrisModel():
     def __init__(self, w: int, h: int):
+        print(w, h)
         if w < 8:
             raise(Exception("game zone width less then 8"))
         if h < 8:
             raise(Exception("game zone height less then 8"))
         self.width = w
         self.height = h
-        self.game_zone = []
+        self.grid = []
         for i in range(self.height):
             row = [9, 9]
             for w in range(self.width):
                 row.append(0)
             row.extend([9, 9])
-            self.game_zone.append(row)
+            self.grid.append(row)
         row = []
         for w in range(self.width+4):
             row.append(9)
-        self.game_zone.append(row)
+        self.grid.append(row)
 
         self.in_game = True
         self.moveX = 2
@@ -104,7 +105,8 @@ class TetrisModel():
         for i in range(4):
             for j in range(4):
                 if (0 != s[i][j]):
-                    if (s[i][j] != s[i][j] + self.game_zone[i + y][j + x + 2]):
+                    # print(i, j, x, y, i+y, j+x+2)
+                    if (self.grid[i + y][j + x + 2] != 0):
                         # print("collision True")
                         return True
         return False
@@ -140,7 +142,7 @@ class TetrisModel():
     def overflow(self):
         ret = False
         for i in range(2, self.width + 2):
-            if self.game_zone[0][i] > 0:
+            if self.grid[0][i] > 0:
                 ret = True
                 break
         return ret
@@ -152,7 +154,7 @@ class TetrisModel():
         for i in range(4):
             for j in range(4):
                 if 0 != s[i][j]:
-                    self.game_zone[i + y][j + x + 2] = self.tetris_num + 1
+                    self.grid[i + y][j + x + 2] = self.tetris_num + 1
         if self.overflow():
             self.in_game = False
 
@@ -160,7 +162,7 @@ class TetrisModel():
         cnt = 0
         ret = True
         for i in range(self.width + 4):
-            if self.game_zone[n][i] > 0:
+            if self.grid[n][i] > 0:
                 cnt += 1
         if cnt < self.width + 4:
             ret = False
@@ -169,16 +171,19 @@ class TetrisModel():
     def melt_it(self, n: int):
         for i in range(n, 0, -1):
             for j in range(self.width + 4):
-                self.game_zone[i][j] = self.game_zone[i - 1][j]
+                self.grid[i][j] = self.grid[i - 1][j]
 
     def try_melt(self):
+        melted = 0
         i = self.height - 1
         while i > 0:
             if self.melt_detect(i):
-                # print("try_melt", i, self.game_zone[i])
+                # print("try_melt", i, self.grid[i])
                 self.melt_it(i)
                 i += +1
+                melted += 1
             i -= 1
+        return melted
 
     def evaluate1(self):
         """评价函数，评价游戏区域的分值，用于搜索最优解答"""
@@ -192,7 +197,7 @@ class TetrisModel():
             cnt = 0
             clearance = True
             for y in range(self.height):
-                if self.game_zone[y][x + 2] > 0:
+                if self.grid[y][x + 2] > 0:
                     clearance = False
                     cnt += 1
                     if mark == 0:
@@ -237,7 +242,7 @@ class TetrisModel():
             cnt = 0
             clearance = True
             for y in range(self.height):
-                if self.game_zone[y][x + 2] > 0:
+                if self.grid[y][x + 2] > 0:
                     clearance = False
                     cnt += 1
                     if mark == 0:
@@ -281,7 +286,7 @@ class TetrisModel():
             cnt = 0
             clearance = True
             for y in range(self.height):
-                if self.game_zone[y][x + 2] > 0:
+                if self.grid[y][x + 2] > 0:
                     clearance = False
                     cnt += 1
                     if mark == 0:
@@ -327,8 +332,8 @@ class TetrisModel():
             if y > self.moveY + 4:
                 continue
             for x in range(self.width):
-                if self.game_zone[y][x + 2] == 0:
-                    if (self.game_zone[y][x + 1] > 0) and (self.game_zone[y][x + 3] > 0):
+                if self.grid[y][x + 2] == 0:
+                    if (self.grid[y][x + 1] > 0) and (self.grid[y][x + 3] > 0):
                         # print("narrow", x, y)
                         narrow += 1
 
@@ -338,7 +343,7 @@ class TetrisModel():
             hang = 0
             clearance = True
             for y in range(self.height):
-                if self.game_zone[y][x + 2] > 0:
+                if self.grid[y][x + 2] > 0:
                     clearance = False
                     cnt += 1
                     hang += 1
@@ -377,12 +382,62 @@ class TetrisModel():
         #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, holes, hangs, narrow))
         return [space + (y1 + y2)*6 - holes*12 - hangs - narrow*4, self.moveX, self.moveY, self.shape_num, holes, hangs, narrow]
 
+    def evaluate5(self, melted=0):
+        """评价函数"""
+        holes = 0
+        hangs = 0  # 悬空
+        narrow = 0  # 窄
+        for y in range(self.moveY, self.height):
+            if y > self.moveY + 4:
+                continue
+            for x in range(self.width):
+                if self.grid[y][x + 2] == 0:
+                    if (self.grid[y][x + 1] > 0) and (self.grid[y][x + 3] > 0):
+                        # print("narrow", x, y)
+                        narrow += 1
+
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            hang = 0
+            clearance = True
+            for y in range(self.height):
+                if self.grid[y][x + 2] > 0:
+                    clearance = False
+                    cnt += 1
+                    hang += 1
+                    if mark == 0:
+                        mark = y
+                else:
+                    if not clearance:
+                        hangs += hang
+                        hang = 0
+            if cnt == 0:  # 本列没有方块，不用计算。
+                continue
+            holes += self.height - mark - cnt  # 洞
+
+        y1 = y2 = self.moveY  # 最低点
+        # s = T[self.tetris_num][self.shape_num]
+        # for i in range(4):
+        #     cnt = 0
+        #     for j in range(4):
+        #         if 0 != s[i][j]:
+        #             cnt += 1
+        #     if cnt == 0:
+        #         y1 += 1
+        #     else:
+        #         y2 += cnt
+
+        # 评价系数
+        point = (y1 + y2)*self.width/2 - holes*self.width - hangs - narrow*3.3
+        return [point, self.moveX, self.moveY, self.shape_num, (melted, holes, hangs, narrow), (y1, y2)]
+
     def solve(self):
         x = -2
         y = 0
         idx = 0
         possible = []
-        for x in range(-2, 11, 1):
+        for x in range(-2, self.width, 1):
             for idx in range(4):
                 if self.collision(x, y, idx):  # 放不下
                     continue
@@ -405,8 +460,8 @@ class TetrisModel():
             t.moveY = y
             t.shape_num = idx
             t.save()
-            t.try_melt()
-            r = t.evaluate4()  # 评价函数
+            m = t.try_melt()
+            r = t.evaluate5(m)  # 评价函数
             answers.append(r)
 
         answers = sorted(answers, key=lambda x: x[0], reverse=True)
@@ -421,26 +476,26 @@ class GameView(Canvas):
     def __init__(self, w=BOARD_WIDTH, h=BOARD_HEIGHT):
         super().__init__(width=w, height=h,
                          background="black", highlightthickness=0)
-        self.create_text(SIDE*3, SIDE*2, text="01:23:45", tag="time",
+        self.create_text(SIDE*4, SIDE*3, text="01:23:45", tag="time",
                          fill="white", font=("Arial", 5+SIDE//2), justify='center')
-        self.create_text(SIDE*3, SIDE*4, text="Score: 0", tag="score",
+        self.create_text(SIDE*4, SIDE*5, text="Score: 0", tag="score",
                          fill="white", font=("Arial", 5+SIDE//2), justify='center')
-        self.create_text(SIDE*3, SIDE*6, text="X: 0",
+        self.create_text(SIDE*4, SIDE*7, text="X: 0",
                          tag="xxx", fill="white", font=("Arial", 3+STEP//2), justify='center')
-        self.create_text(SIDE*3, SIDE*7, text="Y: 0",
+        self.create_text(SIDE*4, SIDE*8, text="Y: 0",
                          tag="yyy", fill="white", font=("Arial", 3+STEP//2), justify='center')
-        self.create_text(SIDE*3, SIDE*8, text="T: 0",
+        self.create_text(SIDE*4, SIDE*9, text="T: 0",
                          tag="ttt", fill="white", font=("Arial", 3+STEP//2), justify='center')
-        self.create_text(SIDE*3, SIDE*9, text="I: 0",
+        self.create_text(SIDE*4, SIDE*10, text="I: 0",
                          tag="iii", fill="white", font=("Arial", 3+STEP//2), justify='center')
-        self.create_rectangle(ZONE_LEFT_PX, ZONE_TOP_PX, ZONE_LEFT_PX + ZONE_WIDTH * STEP,
-                              ZONE_TOP_PX + ZONE_HEIGHT * STEP,
+        self.create_rectangle(GRID_LEFT, GRID_TOP, GRID_LEFT + GRID_WIDTH * STEP,
+                              GRID_TOP + GRID_HEIGHT * STEP,
                               fill="#1f1f1f", width=0, tag="zone")
         self.pack()
 
     def draw_tile(self, x, y, color, tag):
-        rx = ZONE_LEFT_PX + x * STEP
-        ry = ZONE_TOP_PX + y * STEP
+        rx = GRID_LEFT + x * STEP
+        ry = GRID_TOP + y * STEP
         self.create_rectangle(rx, ry, rx + SIDE, ry + SIDE,
                               fill=color, width=0, tag=tag)
 
@@ -461,9 +516,9 @@ class GameView(Canvas):
         # print("melt_tile", n, len(tiles))
         for tile in tiles:
             c = self.coords(tile)
-            if c[1] == n*STEP+ZONE_TOP_PX:
+            if c[1] == n*STEP+GRID_TOP:
                 self.delete(tile)
-            if c[1] < n*STEP+ZONE_TOP_PX:
+            if c[1] < n*STEP+GRID_TOP:
                 self.move(tile, 0, STEP)
 
     def draw_score(self, dt, s, x, y, t, i):
@@ -480,13 +535,6 @@ class GameView(Canvas):
         iii = self.find_withtag("iii")
         self.itemconfigure(iii, text="I: {}".format(i))
 
-    # def game_over(self, score):
-    #     '''删除画布上的所有信息，并显示游戏结束'''
-    #     self.tetris.in_game = False
-    #     self.delete(ALL)
-    #     self.create_text(self.winfo_width() / 2, self.winfo_height()/2,
-    #                      text="Game Over with score {0}".format(score), fill="white")
-
 
 class GameController():
     def __init__(self, model, view, ai=False):
@@ -496,13 +544,13 @@ class GameController():
         self.next_color = "lightblue"
         self.color = self.next_color
         self.score = 0
-        self.nextX = 13
+        self.nextX = 12
         self.nextY = 1
         self.start = datetime.now()
         self.new_tetris()
         if self.ai:
             global DELAY
-            DELAY = 3
+            DELAY = 1
 
     def update(self, save=False):
         if save:
@@ -583,10 +631,10 @@ class GameController():
                                 T[self._model.next_tetris][0], "next")
 
     def try_melt(self):
-        i = ZONE_HEIGHT-1
+        i = GRID_HEIGHT-1
         while i > 0:
             if self._model.melt_detect(i):
-                # print("try_melt", i, self._model.game_zone[i])
+                # print("try_melt", i, self._model.grid[i])
                 self._model.melt_it(i)
                 self._view.melt_tile(i)
                 self.score += 1
@@ -609,7 +657,7 @@ class TetrisGame(Frame):
     def __init__(self, ai=False):
         super().__init__()
         self.master.title('TETRIS - 俄罗斯方块大作战')
-        m = TetrisModel(ZONE_WIDTH, ZONE_HEIGHT)
+        m = TetrisModel(GRID_WIDTH, GRID_HEIGHT)
         v = GameView()
         c = GameController(m, v, ai)
         v.bind_all("<Key>", c.on_key_pressed)
@@ -628,7 +676,7 @@ def verify():
     # 验证模式，无GUI界面动画
     score = 0
     start = datetime.now()
-    m = TetrisModel(ZONE_WIDTH, ZONE_HEIGHT)
+    m = TetrisModel(GRID_WIDTH, GRID_HEIGHT)
     while m.in_game:
         dt = str(datetime.now() - start).split(".")[0]
         m.new_tetris()
@@ -638,7 +686,7 @@ def verify():
         m.shape_num = answer[3]
         m.save()
         # m.try_melt() # 消分
-        i = ZONE_HEIGHT-1
+        i = GRID_HEIGHT-1
         while i > 0:
             if m.melt_detect(i):
                 m.melt_it(i)
