@@ -10,8 +10,8 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas, ALL
 
-STEP = 6  # pixel
-SIDE = 5  #
+STEP = 22  # pixel
+SIDE = 20  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
 
@@ -65,9 +65,9 @@ class TetrisModel():
     def __init__(self, w: int, h: int):
         print(w, h)
         if w < 8:
-            raise(Exception("game zone width less then 8"))
+            raise(Exception("game grid width less then 8"))
         if h < 8:
-            raise(Exception("game zone height less then 8"))
+            raise(Exception("game grid height less then 8"))
         self.width = w
         self.height = h
         self.grid = []
@@ -429,7 +429,8 @@ class TetrisModel():
         #         y2 += cnt
 
         # 评价系数
-        point = (y1 + y2)*self.width/2 - holes*self.width - hangs - narrow*3.3
+        point = (y1 + y2)*self.width//2 - holes * \
+            self.width - hangs - narrow*self.width//3
         return [point, self.moveX, self.moveY, self.shape_num, (melted, holes, hangs, narrow), (y1, y2)]
 
     def solve(self):
@@ -490,7 +491,7 @@ class GameView(Canvas):
                          tag="iii", fill="white", font=("Arial", 3+STEP//2), justify='center')
         self.create_rectangle(GRID_LEFT, GRID_TOP, GRID_LEFT + GRID_WIDTH * STEP,
                               GRID_TOP + GRID_HEIGHT * STEP,
-                              fill="#1f1f1f", width=0, tag="zone")
+                              fill="#1f1f1f", width=0, tag="grid")
         self.pack()
 
     def draw_tile(self, x, y, color, tag):
@@ -544,7 +545,7 @@ class GameController():
         self.next_color = "lightblue"
         self.color = self.next_color
         self.score = 0
-        self.nextX = 12
+        self.nextX = self._model.width + 1
         self.nextY = 1
         self.start = datetime.now()
         self.new_tetris()
