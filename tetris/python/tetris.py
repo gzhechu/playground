@@ -72,14 +72,14 @@ class TetrisModel():
         self.height = h
         self.grid = []
         for i in range(self.height):
-            row = [9, 9]
+            row = [1, 1]
             for w in range(self.width):
                 row.append(0)
-            row.extend([9, 9])
+            row.extend([1, 1])
             self.grid.append(row)
         row = []
         for w in range(self.width+4):
-            row.append(9)
+            row.append(1)
         self.grid.append(row)
 
         self.in_game = True
@@ -154,7 +154,7 @@ class TetrisModel():
         for i in range(4):
             for j in range(4):
                 if 0 != s[i][j]:
-                    self.grid[i + y][j + x + 2] = self.tetris_num + 1
+                    self.grid[i + y][j + x + 2] = 1
         if self.overflow():
             self.in_game = False
 
@@ -190,6 +190,7 @@ class TetrisModel():
         # 01 垂直检测空心悬空的列
         # 02 计算留空的区块数，一般在消融后计算计算
         # 03 检测堆积的高度以及分布
+        self.try_melt()
         solid = self.width
         space = 0
         for x in range(self.width):
@@ -234,6 +235,7 @@ class TetrisModel():
 
     def evaluate2(self):
         """评价函数"""
+        self.try_melt()
         solid = self.width
         space = 0
         holes = 0
@@ -278,6 +280,7 @@ class TetrisModel():
 
     def evaluate3(self):
         """评价函数"""
+        self.try_melt()
         solid = self.width
         space = 0
         holes = 0
@@ -323,6 +326,7 @@ class TetrisModel():
 
     def evaluate4(self):
         """评价函数"""
+        self.try_melt()
         solid = self.width
         space = 0
         holes = 0
@@ -382,8 +386,9 @@ class TetrisModel():
         #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, holes, hangs, narrow))
         return [space + (y1 + y2)*6 - holes*12 - hangs - narrow*4, self.moveX, self.moveY, self.shape_num, holes, hangs, narrow]
 
-    def evaluate5(self, melted=0):
+    def evaluate5(self):
         """评价函数"""
+        melted = self.try_melt()
         holes = 0
         hangs = 0  # 悬空
         narrow = 0  # 窄
@@ -429,9 +434,76 @@ class TetrisModel():
         #         y2 += cnt
 
         # 评价系数
-        point = (y1 + y2)*self.width//2 - holes * \
-            self.width - hangs - narrow*self.width//3
+        point = melted + (y1 + y2)*self.width//2 - holes * \
+            self.width - hangs - narrow*self.width/5
         return [point, self.moveX, self.moveY, self.shape_num, (melted, holes, hangs, narrow), (y1, y2)]
+
+    def PierreDellacherie(self):
+        melted = 0
+        mrows = []
+        cell_cnt = 0
+
+        landingHeight = 0
+        erodedPieceCellsMetric = 0
+        boardRowTransitions = 0
+        boardColumnTransitions = self.width
+        boardBuriedHoles = 0
+        boardWells = 0
+
+        for y in range(self.height):
+            if self.melt_detect(y):
+                melted += 1
+                mrows.append(y)
+            for x in range(self.width + 1):
+                if self.grid[y][x + 1] != self.grid[y][x + 2]:
+                    boardRowTransitions += 1
+
+        for x in range(self.width):
+            mark = 0
+            cnt = 0
+            clearance = True
+            wells = 0
+
+            for y in range(self.height):
+                if self.grid[y][x + 2] != self.grid[y+1][x + 2]:
+                    boardColumnTransitions += 1
+
+                if self.grid[y][x + 2] > 0:
+                    clearance = False
+                    cnt += 1
+                    if mark == 0:
+                        mark = y
+
+                if self.grid[y][x + 2] == 0 and (self.grid[y][x + 1] > 0) and (self.grid[y][x + 3] > 0):
+                    wells += 1
+                else:
+                    boardWells += wells * (wells + 1) // 2
+                    wells = 0
+
+            if cnt > 0:
+                boardBuriedHoles += self.height - mark - cnt  # 洞
+
+        h = [0, 0, 0, 0]
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            for j in range(4):
+                if 0 != s[i][j]:
+                    h[i] = 1
+                    if self.moveY + i in mrows:
+                        cell_cnt += 1
+
+        landingHeight = 16 - self.moveY + sum(h)
+        erodedPieceCellsMetric = cell_cnt * melted
+
+        score = (-4.500158825082766 * landingHeight +
+                 3.4181268101392694 * erodedPieceCellsMetric -
+                 3.2178882868487753 * boardRowTransitions -
+                 9.348695305445199 * boardColumnTransitions -
+                 7.899265427351652 * boardBuriedHoles -
+                 3.3855972247263626 * boardWells)
+        return [score, self.moveX, self.moveY, self.shape_num,
+                (landingHeight, erodedPieceCellsMetric, boardRowTransitions,
+                 boardColumnTransitions, boardBuriedHoles, boardWells)]
 
     def solve(self):
         x = -2
@@ -461,8 +533,8 @@ class TetrisModel():
             t.moveY = y
             t.shape_num = idx
             t.save()
-            m = t.try_melt()
-            r = t.evaluate5(m)  # 评价函数
+            # r = t.evaluate5()  # 评价函数
+            r = t.PierreDellacherie()
             answers.append(r)
 
         answers = sorted(answers, key=lambda x: x[0], reverse=True)
