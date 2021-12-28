@@ -3,6 +3,7 @@
 
 import random
 import copy
+import pickle
 import math
 import sys
 import getopt
@@ -10,8 +11,8 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas, ALL
 
-STEP = 22  # pixel
-SIDE = 20  #
+STEP = 6  # pixel
+SIDE = 5  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
 
@@ -63,7 +64,7 @@ class Direction(Enum):
 
 class TetrisModel():
     def __init__(self, w: int, h: int):
-        print(w, h)
+        # print(w, h)
         if w < 8:
             raise(Exception("game grid width less then 8"))
         if h < 8:
@@ -140,12 +141,9 @@ class TetrisModel():
         return rotate
 
     def overflow(self):
-        ret = False
-        for i in range(2, self.width + 2):
-            if self.grid[0][i] > 0:
-                ret = True
-                break
-        return ret
+        if sum(self.grid[0]) > 4:
+            return True
+        return False
 
     def save(self):
         x = self.moveX
@@ -159,14 +157,10 @@ class TetrisModel():
             self.in_game = False
 
     def melt_detect(self, n: int):
-        cnt = 0
-        ret = True
-        for i in range(self.width + 4):
-            if self.grid[n][i] > 0:
-                cnt += 1
+        cnt = sum(self.grid[n])
         if cnt < self.width + 4:
-            ret = False
-        return ret
+            return False
+        return True
 
     def melt_it(self, n: int):
         for i in range(n, 0, -1):
@@ -443,10 +437,11 @@ class TetrisModel():
         mrows = []
         cell_cnt = 0
 
+        lh = 0
         landingHeight = 0
         erodedPieceCellsMetric = 0
         boardRowTransitions = 0
-        boardColumnTransitions = self.width
+        boardColumnTransitions = 0
         boardBuriedHoles = 0
         boardWells = 0
 
@@ -454,22 +449,25 @@ class TetrisModel():
             if self.melt_detect(y):
                 melted += 1
                 mrows.append(y)
+            last_cell = 1
             for x in range(self.width + 1):
-                if self.grid[y][x + 1] != self.grid[y][x + 2]:
+                cell = self.grid[y][x + 2]
+                if last_cell != cell:
                     boardRowTransitions += 1
+                last_cell = cell
 
         for x in range(self.width):
             mark = 0
             cnt = 0
-            clearance = True
             wells = 0
-
+            last_cell = 1
             for y in range(self.height):
-                if self.grid[y][x + 2] != self.grid[y+1][x + 2]:
+                cell = self.grid[20 - y][x + 2]
+                if last_cell != cell and y < self.height:
                     boardColumnTransitions += 1
+                last_cell = cell
 
                 if self.grid[y][x + 2] > 0:
-                    clearance = False
                     cnt += 1
                     if mark == 0:
                         mark = y
@@ -492,18 +490,57 @@ class TetrisModel():
                     if self.moveY + i in mrows:
                         cell_cnt += 1
 
-        landingHeight = 16 - self.moveY + sum(h)
+        hc = sum(h)     # height of shape
+        he = 0          # empty height at bottom
+        while h[3-he] <= 0:
+            he += 1
+
+        lh = 20 - (self.moveY+4) + he
+        landingHeight = lh + (hc-1)/2
         erodedPieceCellsMetric = cell_cnt * melted
 
         score = (-4.500158825082766 * landingHeight +
-                 3.4181268101392694 * erodedPieceCellsMetric -
+                 3.4181268101392694 * melted -
                  3.2178882868487753 * boardRowTransitions -
                  9.348695305445199 * boardColumnTransitions -
                  7.899265427351652 * boardBuriedHoles -
                  3.3855972247263626 * boardWells)
         return [score, self.moveX, self.moveY, self.shape_num,
                 (landingHeight, erodedPieceCellsMetric, boardRowTransitions,
-                 boardColumnTransitions, boardBuriedHoles, boardWells)]
+                 boardColumnTransitions, boardBuriedHoles, boardWells, h, lh, he, hc)]
+
+    def GetLandingHeight(self):
+        h = 0
+        s = T[self.tetris_num][self.shape_num]
+        for i in range(4):
+            c = sum(s[i])
+            if 0 != c:
+                h += 1
+        landingHeight = 17 - self.moveY + h
+        return landingHeight
+        # return last_move.landing_height + ((last_move.piece.length - 1) / 2)
+
+    def GetRowTransitions(self):
+        transitions = 0
+        for y in range(self.height):
+            last = 1
+            for x in range(self.width + 1):
+                cell = self.grid[y][x + 2]
+                if cell != last:
+                    transitions += 1
+                last = cell
+        return transitions
+
+    def GetColumnTransitions(self):
+        transitions = 0
+        for x in range(self.width + 1):
+            last = 1
+            for y in range(self.height):
+                cell = self.grid[y][x + 2]
+                if cell != last:
+                    transitions += 1
+                last = cell
+        return transitions
 
     def solve(self):
         x = -2
@@ -523,25 +560,22 @@ class TetrisModel():
                 possible.append([x, self.moveY, idx])
         self.moveY = 0  # 恢复位置
 
-        answers = []
+        answer = [-1000000, ]
         for xyz in possible:
             x = xyz[0]
             y = xyz[1]
             idx = xyz[2]
+
             t = copy.deepcopy(self)
+            # t = pickle.loads(pickle.dumps(self, -1))
             t.moveX = x
             t.moveY = y
             t.shape_num = idx
             t.save()
             # r = t.evaluate5()  # 评价函数
             r = t.PierreDellacherie()
-            answers.append(r)
-
-        answers = sorted(answers, key=lambda x: x[0], reverse=True)
-        answer = answers[0]
-        # print("0", answers[0])
-        # print("1", answers[1])
-        # print("2", answers[2])
+            if r[0] > answer[0]:
+                answer = r
         return answer
 
 
@@ -775,8 +809,7 @@ if __name__ == '__main__':
     for opt_name, opt_value in opts:
         if opt_name in ('-v', '--verify'):
             verify()
-            exit()
+            sys.exit()
         if opt_name in ('-a', '--auto'):
             main(ai=True)
-            exit()
-    main()
+            sys.exit()
