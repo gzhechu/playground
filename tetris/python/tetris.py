@@ -9,10 +9,10 @@ import sys
 import getopt
 from datetime import datetime
 from enum import Enum
-from tkinter import Tk, Frame, Canvas, ALL
+from tkinter import Tk, Frame, Canvas
 
-STEP = 6  # pixel
-SIDE = 5  #
+STEP = 22  # pixel
+SIDE = 20  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
 
@@ -52,7 +52,7 @@ T = ((((0, 1, 0, 0), (0, 1, 0, 0), (0, 1, 1, 0), (0, 0, 0, 0)),  # L
       ((0, 0, 0, 0), (1, 1, 1, 0), (0, 1, 0, 0), (0, 0, 0, 0)),
       ((0, 1, 0, 0), (0, 1, 1, 0), (0, 1, 0, 0), (0, 0, 0, 0))))
 
-colors = ["red", "lightblue", "green", "brown",
+COLORS = ["red", "lightblue", "green", "brown",
           "yellow", "pink", "orange", "purple"]
 
 
@@ -74,12 +74,12 @@ class TetrisModel():
         self.grid = []
         for i in range(self.height):
             row = [1, 1]
-            for w in range(self.width):
+            for _ in range(self.width):
                 row.append(0)
             row.extend([1, 1])
             self.grid.append(row)
         row = []
-        for w in range(self.width+4):
+        for _ in range(self.width+4):
             row.append(1)
         self.grid.append(row)
 
@@ -105,9 +105,9 @@ class TetrisModel():
             s = T[self.tetris_num][num]
         for i in range(4):
             for j in range(4):
-                if (0 != s[i][j]):
+                if 0 != s[i][j]:
                     # print(i, j, x, y, i+y, j+x+2)
-                    if (self.grid[i + y][j + x + 2] != 0):
+                    if self.grid[i + y][j + x + 2] != 0:
                         # print("collision True")
                         return True
         return False
@@ -353,10 +353,7 @@ class TetrisModel():
                         hang = 0
                 if clearance:
                     space += 1
-                    pass
-                else:
-                    # space += 1
-                    pass
+
             if cnt == 0:  # 本列没有方块，不用计算。
                 continue
             if cnt != self.height - mark:
@@ -434,8 +431,8 @@ class TetrisModel():
 
     def PierreDellacherie(self):
         melted = 0
-        mrows = []
-        cell_cnt = 0
+        # mrows = []
+        # cell_cnt = 0
 
         lh = 0
         landingHeight = 0
@@ -448,7 +445,7 @@ class TetrisModel():
         for y in range(self.height):
             if self.melt_detect(y):
                 melted += 1
-                mrows.append(y)
+                # mrows.append(y)
             last_cell = 1
             for x in range(self.width + 1):
                 cell = self.grid[y][x + 2]
@@ -458,12 +455,13 @@ class TetrisModel():
 
         for x in range(self.width):
             mark = 0
-            cnt = 0
+            cnt = -1
             wells = 0
+            well_height = 0
             last_cell = 1
-            for y in range(self.height):
-                cell = self.grid[20 - y][x + 2]
-                if last_cell != cell and y < self.height:
+            for y in range(self.height+1):
+                cell = self.grid[20 - y][x + 2]  # from bottom on
+                if last_cell != cell:
                     boardColumnTransitions += 1
                 last_cell = cell
 
@@ -474,9 +472,11 @@ class TetrisModel():
 
                 if self.grid[y][x + 2] == 0 and (self.grid[y][x + 1] > 0) and (self.grid[y][x + 3] > 0):
                     wells += 1
-                else:
-                    boardWells += wells * (wells + 1) // 2
+                    well_height += 1
+                elif wells > 0:
+                    boardWells += (1+wells)*well_height/2
                     wells = 0
+                    well_height = 0
 
             if cnt > 0:
                 boardBuriedHoles += self.height - mark - cnt  # 洞
@@ -487,8 +487,8 @@ class TetrisModel():
             for j in range(4):
                 if 0 != s[i][j]:
                     h[i] = 1
-                    if self.moveY + i in mrows:
-                        cell_cnt += 1
+                    # if self.moveY + i in mrows:
+                    #     cell_cnt += 1
 
         hc = sum(h)     # height of shape
         he = 0          # empty height at bottom
@@ -497,7 +497,7 @@ class TetrisModel():
 
         lh = 20 - (self.moveY+4) + he
         landingHeight = lh + (hc-1)/2
-        erodedPieceCellsMetric = cell_cnt * melted
+        # erodedPieceCellsMetric = cell_cnt * melted
 
         score = (-4.500158825082766 * landingHeight +
                  3.4181268101392694 * melted -
@@ -506,8 +506,8 @@ class TetrisModel():
                  7.899265427351652 * boardBuriedHoles -
                  3.3855972247263626 * boardWells)
         return [score, self.moveX, self.moveY, self.shape_num,
-                (landingHeight, erodedPieceCellsMetric, boardRowTransitions,
-                 boardColumnTransitions, boardBuriedHoles, boardWells, h, lh, he, hc)]
+                (landingHeight, melted, boardRowTransitions,
+                 boardColumnTransitions, boardBuriedHoles, boardWells)]
 
     def GetLandingHeight(self):
         h = 0
@@ -566,8 +566,8 @@ class TetrisModel():
             y = xyz[1]
             idx = xyz[2]
 
-            t = copy.deepcopy(self)
-            # t = pickle.loads(pickle.dumps(self, -1))
+            # t = copy.deepcopy(self)
+            t = pickle.loads(pickle.dumps(self, -1))
             t.moveX = x
             t.moveY = y
             t.shape_num = idx
@@ -614,7 +614,7 @@ class GameView(Canvas):
             tag = "save"
         for i in range(4):
             for j in range(4):
-                if (0 != shape[i][j]):
+                if 0 != shape[i][j]:
                     self.draw_tile(x + j, y + i, color, tag)
 
     def melt_tile(self, n):
@@ -642,6 +642,16 @@ class GameView(Canvas):
         iii = self.find_withtag("iii")
         self.itemconfigure(iii, text="I: {}".format(i))
 
+    def game_over(self, score):
+        self.create_rectangle(STEP*5, self.winfo_height()/2-STEP*3,
+                              self.winfo_width()-STEP*5,
+                              self.winfo_height()/2+STEP,
+                              fill="#2f2f2f", width=1, tag="gameover")
+
+        self.create_text(self.winfo_width() / 2, self.winfo_height()/2-STEP,
+                         text="Game Over with Score {0}.".format(score), fill="white",
+                         font=("Arial", 5+STEP//2))
+
 
 class GameController():
     def __init__(self, model, view, ai=False):
@@ -655,9 +665,10 @@ class GameController():
         self.nextY = 1
         self.start = datetime.now()
         self.new_tetris()
+        self.dt = ""
         if self.ai:
             global DELAY
-            DELAY = 1
+            DELAY = 3
 
     def update(self, save=False):
         if save:
@@ -711,7 +722,6 @@ class GameController():
             if not self._model.pause_move:
                 if self._model.move(Direction.DOWN):
                     self.update()
-                    pass
                 else:
                     self.update(save=True)
                     self._model.save()
@@ -730,7 +740,7 @@ class GameController():
 
     def new_tetris(self):
         self.color = self.next_color
-        self.next_color = colors[random.randint(0, 100) % 8]
+        self.next_color = COLORS[random.randint(0, 100) % 8]
         self._model.new_tetris()
         self._view.redraw_shape(self._model.moveX, self._model.moveY, self.color,
                                 T[self._model.tetris_num][self._model.shape_num], "move")
@@ -750,14 +760,7 @@ class GameController():
 
     def game_over(self):
         self._model.in_game = False
-        # self._view.delete(ALL)
-        self._view.create_text(self._view.winfo_width() / 2, self._view.winfo_height()/2-SIDE,
-                               text="Game Over with Score {0}.".format(self.score), fill="white",
-                               font=("Arial", 5+SIDE//2))
-        # self._view.after(1000, self._quit)
-
-    # def _quit(self):
-    #     self._view.quit()
+        self._view.game_over(self.score)
 
 
 class TetrisGame(Frame):
@@ -775,7 +778,7 @@ class TetrisGame(Frame):
 
 def main(ai=False):
     root = Tk()
-    nib = TetrisGame(ai)
+    TetrisGame(ai)
     root.mainloop()
 
 
@@ -792,7 +795,6 @@ def verify():
         m.moveY = answer[2]
         m.shape_num = answer[3]
         m.save()
-        # m.try_melt() # 消分
         i = GRID_HEIGHT-1
         while i > 0:
             if m.melt_detect(i):
@@ -813,3 +815,4 @@ if __name__ == '__main__':
         if opt_name in ('-a', '--auto'):
             main(ai=True)
             sys.exit()
+    main()
