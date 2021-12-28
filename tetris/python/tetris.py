@@ -6,6 +6,7 @@ import copy
 import pickle
 import math
 import sys
+import os
 import getopt
 from datetime import datetime
 from enum import Enum
@@ -93,7 +94,8 @@ class TetrisModel():
 
     def new_tetris(self):
         self.tetris_num = self.next_tetris
-        self.next_tetris = random.randint(0, len(T)-1)
+        self.next_tetris = int.from_bytes(os.urandom(
+            4), byteorder='little', signed=False) % 7
         self.moveX = int(self.width / 2 - 2)
         self.moveY = 0
 
