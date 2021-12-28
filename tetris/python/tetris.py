@@ -509,39 +509,6 @@ class TetrisModel():
                 (landingHeight, melted, boardRowTransitions,
                  boardColumnTransitions, boardBuriedHoles, boardWells)]
 
-    def GetLandingHeight(self):
-        h = 0
-        s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            c = sum(s[i])
-            if 0 != c:
-                h += 1
-        landingHeight = 17 - self.moveY + h
-        return landingHeight
-        # return last_move.landing_height + ((last_move.piece.length - 1) / 2)
-
-    def GetRowTransitions(self):
-        transitions = 0
-        for y in range(self.height):
-            last = 1
-            for x in range(self.width + 1):
-                cell = self.grid[y][x + 2]
-                if cell != last:
-                    transitions += 1
-                last = cell
-        return transitions
-
-    def GetColumnTransitions(self):
-        transitions = 0
-        for x in range(self.width + 1):
-            last = 1
-            for y in range(self.height):
-                cell = self.grid[y][x + 2]
-                if cell != last:
-                    transitions += 1
-                last = cell
-        return transitions
-
     def solve(self):
         x = -2
         y = 0
