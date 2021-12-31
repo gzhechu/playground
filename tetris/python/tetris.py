@@ -12,8 +12,8 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas
 
-STEP = 22  # pixel
-SIDE = 20  #
+STEP = 28  # pixel
+SIDE = 26  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
 
@@ -70,6 +70,7 @@ class TetrisModel():
             raise(Exception("game grid width less then 8"))
         if h < 8:
             raise(Exception("game grid height less then 8"))
+        self.count = 0
         self.width = w
         self.height = h
         self.grid = []
@@ -89,11 +90,13 @@ class TetrisModel():
         self.moveY = 0
         self.shape_num = 0
         self.tetris_num = 0
-        self.next_tetris = 1
+        self.next_tetris = 6
         self.pause_move = False
 
     def new_tetris(self):
+        self.count += 1
         self.tetris_num = self.next_tetris
+        # self.next_tetris = 6
         self.next_tetris = int.from_bytes(os.urandom(
             4), byteorder='little', signed=False) % 7
         self.moveX = int(self.width / 2 - 2)
@@ -432,27 +435,20 @@ class TetrisModel():
         return [point, self.moveX, self.moveY, self.shape_num, (melted, holes, hangs, narrow), (y1, y2)]
 
     def PierreDellacherie(self):
-        melted = 0
-        # mrows = []
-        # cell_cnt = 0
+        melted = self.try_melt()
 
-        lh = 0
-        landingHeight = 0
-        erodedPieceCellsMetric = 0
-        boardRowTransitions = 0
-        boardColumnTransitions = 0
-        boardBuriedHoles = 0
-        boardWells = 0
+        LandingHeight = 0
+        RowTransitions = 0
+        ColumnTransitions = 0
+        NumberOfHoles = 0
+        WellSums = 0
 
         for y in range(self.height):
-            if self.melt_detect(y):
-                melted += 1
-                # mrows.append(y)
             last_cell = 1
             for x in range(self.width + 1):
                 cell = self.grid[y][x + 2]
                 if last_cell != cell:
-                    boardRowTransitions += 1
+                    RowTransitions += 1
                 last_cell = cell
 
         for x in range(self.width):
@@ -464,7 +460,7 @@ class TetrisModel():
             for y in range(self.height+1):
                 cell = self.grid[20 - y][x + 2]  # from bottom on
                 if last_cell != cell:
-                    boardColumnTransitions += 1
+                    ColumnTransitions += 1
                 last_cell = cell
 
                 if self.grid[y][x + 2] > 0:
@@ -476,12 +472,12 @@ class TetrisModel():
                     wells += 1
                     well_height += 1
                 elif wells > 0:
-                    boardWells += (1+wells)*well_height/2
+                    WellSums += (1+wells)*well_height/2  # 高斯求和
                     wells = 0
                     well_height = 0
 
             if cnt > 0:
-                boardBuriedHoles += self.height - mark - cnt  # 洞
+                NumberOfHoles += self.height - mark - cnt  # 洞
 
         h = [0, 0, 0, 0]
         s = T[self.tetris_num][self.shape_num]
@@ -489,8 +485,6 @@ class TetrisModel():
             for j in range(4):
                 if 0 != s[i][j]:
                     h[i] = 1
-                    # if self.moveY + i in mrows:
-                    #     cell_cnt += 1
 
         hc = sum(h)     # height of shape
         he = 0          # empty height at bottom
@@ -498,18 +492,17 @@ class TetrisModel():
             he += 1
 
         lh = 20 - (self.moveY+4) + he
-        landingHeight = lh + (hc-1)/2
-        # erodedPieceCellsMetric = cell_cnt * melted
+        LandingHeight = lh + (hc-1)/2
 
-        score = (-4.500158825082766 * landingHeight +
-                 3.4181268101392694 * melted -
-                 3.2178882868487753 * boardRowTransitions -
-                 9.348695305445199 * boardColumnTransitions -
-                 7.899265427351652 * boardBuriedHoles -
-                 3.3855972247263626 * boardWells)
+        score = (-4.500158825082766 * LandingHeight +
+                 3.4181268101392694 * melted +
+                 -3.2178882868487753 * RowTransitions +
+                 -9.348695305445199 * ColumnTransitions +
+                 -7.899265427351652 * NumberOfHoles +
+                 -3.3855972247263626 * WellSums)
         return [score, self.moveX, self.moveY, self.shape_num,
-                (landingHeight, melted, boardRowTransitions,
-                 boardColumnTransitions, boardBuriedHoles, boardWells)]
+                (self.count, LandingHeight, melted, RowTransitions,
+                 ColumnTransitions, NumberOfHoles, WellSums)]
 
     def solve(self):
         x = -2
@@ -603,7 +596,7 @@ class GameView(Canvas):
         score = self.find_withtag("score")
         self.itemconfigure(score, text="Score: {0}".format(s))
         xxx = self.find_withtag("xxx")
-        self.itemconfigure(xxx, text="X: {}".format(x+2))
+        self.itemconfigure(xxx, text="X: {}".format(x))
         yyy = self.find_withtag("yyy")
         self.itemconfigure(yyy, text="Y: {}".format(y))
         ttt = self.find_withtag("ttt")
