@@ -40,7 +40,7 @@ T.append([{"shape": [2, 2, 3], "width": 2, "height": 3},  # L
 T.append([{"shape": [2, 7], "width": 3, "height": 2},  # T
           {"shape": [2, 3, 2], "width": 2, "height": 3},
           {"shape": [7, 2], "width": 3, "height": 2},
-          {"shape": [2, 6, 2], "width": 3, "height": 3}])
+          {"shape": [1, 3, 1], "width": 2, "height": 3}])
 T.append([{"shape": [1, 1, 1, 1], "width": 1, "height": 4},  # I
           {"shape": [15], "width": 4, "height": 1}])
 print("length of T:", len(T))
