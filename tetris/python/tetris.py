@@ -4,7 +4,6 @@
 import random
 import copy
 import pickle
-import math
 import sys
 import os
 import getopt
@@ -24,34 +23,27 @@ GRID_TOP = STEP*2  # pixel
 GRID_LEFT = (BOARD_WIDTH-STEP*GRID_WIDTH)/2  # pixel
 
 
-T = ((((0, 1, 0, 0), (0, 1, 0, 0), (0, 1, 1, 0), (0, 0, 0, 0)),  # L
-      ((0, 0, 0, 0), (0, 0, 1, 0), (1, 1, 1, 0), (0, 0, 0, 0)),
-      ((1, 1, 0, 0), (0, 1, 0, 0), (0, 1, 0, 0), (0, 0, 0, 0)),
-      ((0, 0, 0, 0), (1, 1, 1, 0), (1, 0, 0, 0), (0, 0, 0, 0))),
-     (((0, 1, 1, 0), (0, 1, 1, 0), (0, 0, 0, 0), (0, 0, 0, 0)),  # O
-      ((0, 1, 1, 0), (0, 1, 1, 0), (0, 0, 0, 0), (0, 0, 0, 0)),
-      ((0, 1, 1, 0), (0, 1, 1, 0), (0, 0, 0, 0), (0, 0, 0, 0)),
-      ((0, 1, 1, 0), (0, 1, 1, 0), (0, 0, 0, 0), (0, 0, 0, 0))),
-     (((0, 0, 1, 0), (0, 0, 1, 0), (0, 1, 1, 0), (0, 0, 0, 0)),  # J
-      ((0, 0, 0, 0), (1, 1, 1, 0), (0, 0, 1, 0), (0, 0, 0, 0)),
-      ((0, 1, 1, 0), (0, 1, 0, 0), (0, 1, 0, 0), (0, 0, 0, 0)),
-      ((0, 0, 0, 0), (1, 0, 0, 0), (1, 1, 1, 0), (0, 0, 0, 0))),
-     (((0, 0, 0, 0), (1, 1, 0, 0), (0, 1, 1, 0), (0, 0, 0, 0)),  # Z
-      ((0, 1, 0, 0), (1, 1, 0, 0), (1, 0, 0, 0), (0, 0, 0, 0)),
-      ((0, 0, 0, 0), (1, 1, 0, 0), (0, 1, 1, 0), (0, 0, 0, 0)),
-      ((0, 1, 0, 0), (1, 1, 0, 0), (1, 0, 0, 0), (0, 0, 0, 0))),
-     (((0, 0, 0, 0), (0, 1, 1, 0), (1, 1, 0, 0), (0, 0, 0, 0)),  # S
-      ((1, 0, 0, 0), (1, 1, 0, 0), (0, 1, 0, 0), (0, 0, 0, 0)),
-      ((0, 0, 0, 0), (0, 1, 1, 0), (1, 1, 0, 0), (0, 0, 0, 0)),
-      ((1, 0, 0, 0), (1, 1, 0, 0), (0, 1, 0, 0), (0, 0, 0, 0))),
-     (((0, 1, 0, 0), (0, 1, 0, 0), (0, 1, 0, 0), (0, 1, 0, 0)),  # I
-      ((0, 0, 0, 0), (0, 0, 0, 0), (0, 0, 0, 0), (1, 1, 1, 1)),
-      ((0, 0, 1, 0), (0, 0, 1, 0), (0, 0, 1, 0), (0, 0, 1, 0)),
-      ((0, 0, 0, 0), (0, 0, 0, 0), (0, 0, 0, 0), (1, 1, 1, 1))),
-     (((0, 0, 0, 0), (0, 1, 0, 0), (1, 1, 1, 0), (0, 0, 0, 0)),  # T
-      ((0, 1, 0, 0), (1, 1, 0, 0), (0, 1, 0, 0), (0, 0, 0, 0)),
-      ((0, 0, 0, 0), (1, 1, 1, 0), (0, 1, 0, 0), (0, 0, 0, 0)),
-      ((0, 1, 0, 0), (0, 1, 1, 0), (0, 1, 0, 0), (0, 0, 0, 0))))
+T = []
+T.append([{"shape": [3, 3], "width": 2, "height": 2}])  # O
+T.append([{"shape": [3, 6], "width": 3, "height": 2},  # S
+          {"shape": [2, 3, 1], "width": 2, "height": 3}])
+T.append([{"shape": [6, 3], "width": 3, "height": 2},  # Z
+          {"shape": [1, 3, 2], "width": 2, "height": 3}])
+T.append([{"shape": [1, 1, 3], "width": 2, "height": 3},  # J
+          {"shape": [4, 7], "width": 3, "height": 2},
+          {"shape": [3, 2, 2], "width": 2, "height": 3},
+          {"shape": [7, 1], "width": 3, "height": 2}])
+T.append([{"shape": [2, 2, 3], "width": 2, "height": 3},  # L
+          {"shape": [1, 7], "width": 3, "height": 2},
+          {"shape": [3, 1, 1], "width": 2, "height": 3},
+          {"shape": [7, 4], "width": 3, "height": 2}])
+T.append([{"shape": [2, 7], "width": 3, "height": 2},  # T
+          {"shape": [2, 3, 2], "width": 2, "height": 3},
+          {"shape": [7, 2], "width": 3, "height": 2},
+          {"shape": [2, 6, 2], "width": 3, "height": 3}])
+T.append([{"shape": [1, 1, 1, 1], "width": 1, "height": 4},  # I
+          {"shape": [15], "width": 4, "height": 1}])
+print("length of T:", len(T))
 
 COLORS = ["red", "lightblue", "green", "brown",
           "yellow", "pink", "orange", "purple"]
@@ -75,46 +67,44 @@ class TetrisModel():
         self.height = h
         self.grid = []
         for i in range(self.height):
-            row = [1, 1]
-            for _ in range(self.width):
-                row.append(0)
-            row.extend([1, 1])
-            self.grid.append(row)
-        row = []
-        for _ in range(self.width+4):
-            row.append(1)
-        self.grid.append(row)
+            self.grid.append(0)
 
         self.in_game = True
-        self.moveX = 2
+        self.moveX = 3
         self.moveY = 0
         self.shape_num = 0
         self.tetris_num = 0
-        self.next_tetris = 6
+        self.next_tetris = 0
         self.pause_move = False
 
     def new_tetris(self):
         self.count += 1
         self.tetris_num = self.next_tetris
-        # self.next_tetris = 6
+        self.next_tetris = 0
+        self.shape_num = 0
         self.next_tetris = int.from_bytes(os.urandom(
             4), byteorder='little', signed=False) % 7
-        self.moveX = int(self.width / 2 - 2)
+        self.moveX = int(self.width / 2 - 1)
         self.moveY = 0
 
     def collision(self, x: int, y: int, num=None):
-        # print(x, y, num)
+        # print("collision:", x, y, num)
+        if x < 0:
+            return True
+
         if num is None:
             s = T[self.tetris_num][self.shape_num]
         else:
             s = T[self.tetris_num][num]
-        for i in range(4):
-            for j in range(4):
-                if 0 != s[i][j]:
-                    # print(i, j, x, y, i+y, j+x+2)
-                    if self.grid[i + y][j + x + 2] != 0:
-                        # print("collision True")
-                        return True
+
+        if x > self.width - s["width"]:
+            return True
+        if y > self.height - s["height"]:
+            return True
+
+        for h in range(s["height"]):
+            if (s["shape"][h] << x) & self.grid[y+h] != 0:
+                return True
         return False
 
     def move(self, d: Direction):
@@ -131,12 +121,12 @@ class TetrisModel():
             if not self.collision(self.moveX, self.moveY+1):
                 self.moveY += 1
                 ret = True
-        # print("x={}, y={}".format(self.moveX, self.moveY))
         return ret
 
     def rotate(self):
         rotate = False
-        if self.shape_num >= 3:
+        s = T[self.tetris_num]
+        if self.shape_num >= len(s) - 1:
             if not self.collision(self.moveX, self.moveY, 0):
                 self.shape_num = 0
                 rotate = True
@@ -146,7 +136,7 @@ class TetrisModel():
         return rotate
 
     def overflow(self):
-        if sum(self.grid[0]) > 4:
+        if self.grid[0] > 0:
             return True
         return False
 
@@ -154,285 +144,33 @@ class TetrisModel():
         x = self.moveX
         y = self.moveY
         s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            for j in range(4):
-                if 0 != s[i][j]:
-                    self.grid[i + y][j + x + 2] = 1
+        for h in range(s["height"]):
+            self.grid[h + y] = self.grid[h + y] | (s["shape"][h] << x)
+
         if self.overflow():
             self.in_game = False
 
     def melt_detect(self, n: int):
-        cnt = sum(self.grid[n])
-        if cnt < self.width + 4:
+        cnt = self.grid[n]
+        if cnt + 1 < 1 << self.width:
             return False
         return True
 
     def melt_it(self, n: int):
-        for i in range(n, 0, -1):
-            for j in range(self.width + 4):
-                self.grid[i][j] = self.grid[i - 1][j]
+        for y in range(n, 0, -1):
+            self.grid[y] = self.grid[y - 1]
 
     def try_melt(self):
         melted = 0
         i = self.height - 1
         while i > 0:
             if self.melt_detect(i):
-                # print("try_melt", i, self.grid[i])
+                print("try_melt", i, self.grid[i])
                 self.melt_it(i)
                 i += +1
                 melted += 1
             i -= 1
         return melted
-
-    def evaluate1(self):
-        """评价函数，评价游戏区域的分值，用于搜索最优解答"""
-        # 01 垂直检测空心悬空的列
-        # 02 计算留空的区块数，一般在消融后计算计算
-        # 03 检测堆积的高度以及分布
-        self.try_melt()
-        solid = self.width
-        space = 0
-        for x in range(self.width):
-            mark = 0
-            cnt = 0
-            clearance = True
-            for y in range(self.height):
-                if self.grid[y][x + 2] > 0:
-                    clearance = False
-                    cnt += 1
-                    if mark == 0:
-                        mark = y
-                if clearance:
-                    space += 1
-                else:
-                    continue
-            if cnt == 0:  # 本列没有方块，不用计算。
-                continue
-            if cnt != self.height - mark:
-                solid -= 1
-        aspect = 1  # 高宽比
-        w = [0, 0, 0, 0]
-        h = [0, 0, 0, 0]
-        y1 = y2 = self.moveY  # 找到最低点
-        s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            cnt = 0
-            for j in range(4):
-                if 0 != s[i][j]:
-                    cnt += 1
-                    w[j] = 1
-                    h[i] = 1
-            if cnt == 0:
-                y1 += 1
-            else:
-                y2 += cnt
-        aspect = math.ceil(sum(w)/sum(h))
-        # print("x {} y {} i {} solid {} space {} y1 {} y2 {}".format(
-        #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2))
-        # return [solid * 100 + y, self.moveX, self.moveY, self.shape_num]
-        return [space + y1 + y2 + aspect, self.moveX, self.moveY, self.shape_num]
-
-    def evaluate2(self):
-        """评价函数"""
-        self.try_melt()
-        solid = self.width
-        space = 0
-        holes = 0
-        for x in range(self.width):
-            mark = 0
-            cnt = 0
-            clearance = True
-            for y in range(self.height):
-                if self.grid[y][x + 2] > 0:
-                    clearance = False
-                    cnt += 1
-                    if mark == 0:
-                        mark = y
-                if clearance:
-                    space += 1
-                else:
-                    continue
-            if cnt == 0:  # 本列没有方块，不用计算。
-                continue
-            if cnt != self.height - mark:
-                solid -= 1
-            holes += self.height - mark - cnt  # 洞
-        aspect = 1  # 高宽比
-        w = [0, 0, 0, 0]
-        h = [0, 0, 0, 0]
-        y1 = y2 = self.moveY  # 最低点
-        s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            cnt = 0
-            for j in range(4):
-                if 0 != s[i][j]:
-                    w[j] = 1
-                    h[i] = 1
-                    cnt += 1
-            if cnt == 0:
-                y1 += 1
-            else:
-                y2 += cnt
-        aspect = math.ceil(sum(w)/sum(h))
-        # 评价系数
-        return [space + y1 + y2 - holes*12, self.moveX, self.moveY, self.shape_num]
-
-    def evaluate3(self):
-        """评价函数"""
-        self.try_melt()
-        solid = self.width
-        space = 0
-        holes = 0
-        for x in range(self.width):
-            mark = 0
-            cnt = 0
-            clearance = True
-            for y in range(self.height):
-                if self.grid[y][x + 2] > 0:
-                    clearance = False
-                    cnt += 1
-                    if mark == 0:
-                        mark = y
-                if clearance:
-                    space += 1
-                else:
-                    continue
-            if cnt == 0:  # 本列没有方块，不用计算。
-                continue
-            if cnt != self.height - mark:
-                solid -= 1
-            holes += self.height - mark - cnt  # 洞
-        aspect = 1  # 高宽比
-        w = [0, 0, 0, 0]
-        h = [0, 0, 0, 0]
-        y1 = y2 = self.moveY  # 最低点
-        s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            cnt = 0
-            for j in range(4):
-                if 0 != s[i][j]:
-                    w[j] = 1
-                    h[i] = 1
-                    cnt += 1
-            if cnt == 0:
-                y1 += 1
-            else:
-                y2 += cnt
-        aspect = math.ceil(sum(w)/sum(h))
-        # 评价系数
-        return [space + y1 + y2 + aspect - holes*5, self.moveX, self.moveY, self.shape_num]
-        # return [solid * 100000 + space * 100 + y1 + y2, self.moveX, self.moveY, self.shape_num]
-
-    def evaluate4(self):
-        """评价函数"""
-        self.try_melt()
-        solid = self.width
-        space = 0
-        holes = 0
-        hangs = 0  # 悬空
-        narrow = 0  # 窄
-        for y in range(self.moveY, self.height):
-            if y > self.moveY + 4:
-                continue
-            for x in range(self.width):
-                if self.grid[y][x + 2] == 0:
-                    if (self.grid[y][x + 1] > 0) and (self.grid[y][x + 3] > 0):
-                        # print("narrow", x, y)
-                        narrow += 1
-
-        for x in range(self.width):
-            mark = 0
-            cnt = 0
-            hang = 0
-            clearance = True
-            for y in range(self.height):
-                if self.grid[y][x + 2] > 0:
-                    clearance = False
-                    cnt += 1
-                    hang += 1
-                    if mark == 0:
-                        mark = y
-                else:
-                    if not clearance:
-                        hangs += hang
-                        hang = 0
-                if clearance:
-                    space += 1
-
-            if cnt == 0:  # 本列没有方块，不用计算。
-                continue
-            if cnt != self.height - mark:
-                solid -= 1
-            holes += self.height - mark - cnt  # 洞
-
-        y1 = y2 = self.moveY  # 最低点
-        s = T[self.tetris_num][self.shape_num]
-        for i in range(4):
-            cnt = 0
-            for j in range(4):
-                if 0 != s[i][j]:
-                    cnt += 1
-            if cnt == 0:
-                y1 += 1
-            else:
-                y2 += cnt
-
-        # 评价系数
-        # print("x {} y {} i {} solid {} space {} y1 {} y2 {} holes {} hangs {} narrow {}".format(
-        #     self.moveX, self.moveY, self.shape_num, solid, space, y1, y2, holes, hangs, narrow))
-        return [space + (y1 + y2)*6 - holes*12 - hangs - narrow*4, self.moveX, self.moveY, self.shape_num, holes, hangs, narrow]
-
-    def evaluate5(self):
-        """评价函数"""
-        melted = self.try_melt()
-        holes = 0
-        hangs = 0  # 悬空
-        narrow = 0  # 窄
-        for y in range(self.moveY, self.height):
-            if y > self.moveY + 4:
-                continue
-            for x in range(self.width):
-                if self.grid[y][x + 2] == 0:
-                    if (self.grid[y][x + 1] > 0) and (self.grid[y][x + 3] > 0):
-                        # print("narrow", x, y)
-                        narrow += 1
-
-        for x in range(self.width):
-            mark = 0
-            cnt = 0
-            hang = 0
-            clearance = True
-            for y in range(self.height):
-                if self.grid[y][x + 2] > 0:
-                    clearance = False
-                    cnt += 1
-                    hang += 1
-                    if mark == 0:
-                        mark = y
-                else:
-                    if not clearance:
-                        hangs += hang
-                        hang = 0
-            if cnt == 0:  # 本列没有方块，不用计算。
-                continue
-            holes += self.height - mark - cnt  # 洞
-
-        y1 = y2 = self.moveY  # 最低点
-        # s = T[self.tetris_num][self.shape_num]
-        # for i in range(4):
-        #     cnt = 0
-        #     for j in range(4):
-        #         if 0 != s[i][j]:
-        #             cnt += 1
-        #     if cnt == 0:
-        #         y1 += 1
-        #     else:
-        #         y2 += cnt
-
-        # 评价系数
-        point = melted + (y1 + y2)*self.width//2 - holes * \
-            self.width - hangs - narrow*self.width/5
-        return [point, self.moveX, self.moveY, self.shape_num, (melted, holes, hangs, narrow), (y1, y2)]
 
     def PierreDellacherie(self):
         melted = self.try_melt()
@@ -574,10 +312,10 @@ class GameView(Canvas):
             self.delete(dot)
         if save:
             tag = "save"
-        for i in range(4):
-            for j in range(4):
-                if 0 != shape[i][j]:
-                    self.draw_tile(x + j, y + i, color, tag)
+        for h in range(shape["height"]):
+            for w in range(shape["width"]):
+                if (shape["shape"][h] >> w) & 1:
+                    self.draw_tile(x + w, y + h, color, tag)
 
     def melt_tile(self, n):
         tag = "save"
@@ -671,7 +409,8 @@ class GameController():
 
         ESCAPE_CURSOR_KEY = "Escape"
         if key == ESCAPE_CURSOR_KEY:
-            self.game_over()
+            # self.game_over()
+            sys.exit(0)
 
         SPACE_CURSOR_KEY = "space"
         if key == SPACE_CURSOR_KEY:
@@ -679,6 +418,7 @@ class GameController():
                 self.update()
 
     def on_timer(self):
+        pass
         if self._model.in_game:
             self.dt = str(datetime.now() - self.start).split(".")[0]
             if not self._model.pause_move:
@@ -713,7 +453,7 @@ class GameController():
         i = GRID_HEIGHT-1
         while i > 0:
             if self._model.melt_detect(i):
-                # print("try_melt", i, self._model.grid[i])
+                print("try_melt", i, self._model.grid[i])
                 self._model.melt_it(i)
                 self._view.melt_tile(i)
                 self.score += 1
