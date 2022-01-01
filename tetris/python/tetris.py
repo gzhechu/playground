@@ -11,8 +11,8 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas
 
-STEP = 28  # pixel
-SIDE = 26  #
+STEP = 19  # pixel
+SIDE = 17  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
 
@@ -80,18 +80,17 @@ class TetrisModel():
     def new_tetris(self):
         self.count += 1
         self.tetris_num = self.next_tetris
-        self.next_tetris = 0
         self.shape_num = 0
         self.next_tetris = int.from_bytes(os.urandom(
             4), byteorder='little', signed=False) % 7
+        # self.next_tetris = 5
         self.moveX = int(self.width / 2 - 1)
         self.moveY = 0
 
     def collision(self, x: int, y: int, num=None):
-        # print("collision:", x, y, num)
         if x < 0:
             return True
-
+        # print("collision:", self.tetris_num, x, y, num)
         if num is None:
             s = T[self.tetris_num][self.shape_num]
         else:
@@ -135,41 +134,37 @@ class TetrisModel():
             rotate = True
         return rotate
 
-    def overflow(self):
-        if self.grid[0] > 0:
-            return True
-        return False
-
-    def save(self):
-        x = self.moveX
-        y = self.moveY
-        s = T[self.tetris_num][self.shape_num]
+    def save(self, grid=None, x=None, y=None, num=None):
+        # print("save", grid, x, y, num)
+        if not grid:
+            grid = self.grid
+        if not x:
+            x = self.moveX
+        if not y:
+            y = self.moveY
+        if not num:
+            num = self.shape_num
+        s = T[self.tetris_num][num]
         for h in range(s["height"]):
-            self.grid[h + y] = self.grid[h + y] | (s["shape"][h] << x)
+            grid[h + y] = grid[h + y] | (s["shape"][h] << x)
 
-        if self.overflow():
+        if grid[0] > 0:
             self.in_game = False
+        return grid
 
-    def melt_detect(self, n: int):
-        cnt = self.grid[n]
-        if cnt + 1 < 1 << self.width:
-            return False
-        return True
-
-    def melt_it(self, n: int):
-        for y in range(n, 0, -1):
-            self.grid[y] = self.grid[y - 1]
-
-    def try_melt(self):
-        melted = 0
-        i = self.height - 1
-        while i > 0:
-            if self.melt_detect(i):
-                print("try_melt", i, self.grid[i])
-                self.melt_it(i)
-                i += +1
-                melted += 1
-            i -= 1
+    def try_melt(self, grid=None):
+        if not grid:
+            grid = self.grid
+        melted = []
+        h = self.height - 1
+        while h > 0:
+            if 1 << self.width <= grid[h] + 1:
+                # print("try_melt", h, grid[h])
+                melted.append(h)
+                for y in range(h, 0, -1):
+                    grid[y] = self.grid[y - 1]
+                h += +1
+            h -= 1
         return melted
 
     def PierreDellacherie(self):
@@ -242,13 +237,107 @@ class TetrisModel():
                 (self.count, LandingHeight, melted, RowTransitions,
                  ColumnTransitions, NumberOfHoles, WellSums)]
 
+    def evaluate(self, grid=None):
+        # Impletment of Pierre Dellacherie  AI algorithm (El-Tetris)
+        if not grid:
+            grid = self.grid
+
+        LandingHeight = 0
+        RowTransitions = 0
+        ColumnTransitions = 0
+        NumberOfHoles = 0
+        WellSums = 0
+        melted = len(self.try_melt(grid))
+
+        # column transtion
+        for y in range(self.height):
+            last_cell = 1
+            for x in range(self.width):
+                cell = (grid[y] >> x) & 1
+                if last_cell != cell:
+                    RowTransitions += 1
+                last_cell = cell
+            if cell == 0:
+                RowTransitions += 1
+
+        for x in range(self.width):
+            mark = 0
+            col_cells = 0
+            wells = 0
+            well_height = 0
+            last_cell = 0
+            for y in range(self.height):
+                # column transtion
+                cell = (grid[y] >> x) & 1
+                # print(x, y, last_cell, cell, ColumnTransitions)
+                if last_cell != cell:
+                    ColumnTransitions += 1
+                last_cell = cell
+
+                # wells
+                # print(x, y, cell, )
+                if x == 0:
+                    if cell == 0 and (grid[y] >> 1 & 1) == 1:
+                        wells += 1
+                    elif wells > 0:
+                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        wells = 0
+                    if y >= self.height-1:
+                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        wells = 0
+                elif x == self.width - 1:
+                    if cell == 0 and (grid[y] >> x-1 & 1) == 1:
+                        wells += 1
+                    elif wells > 0:
+                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        wells = 0
+                    if y >= self.height-1:
+                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        wells = 0
+                else:
+                    if cell == 0 and (grid[y] >> x-1 & 1) == 1 and (grid[y] >> x+1 & 1) == 1:
+                        wells += 1
+                    elif wells > 0:
+                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        wells = 0
+                    if y >= self.height-1:
+                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        wells = 0
+
+                if cell == 1:
+                    col_cells += 1
+                    if mark == 0:
+                        mark = y
+
+            if col_cells > 0:
+                NumberOfHoles += (self.height - mark - col_cells)
+            if last_cell == 0:
+                ColumnTransitions += 1
+            # print(x, ColumnTransitions, NumberOfHoles, WellSums)
+
+        s = T[self.tetris_num][self.shape_num]
+        lh = 20 - (self.moveY+s["height"])
+        LandingHeight = lh + (s["height"]-1)/2
+
+        score = (-4.500158825082766 * LandingHeight +
+                 3.4181268101392694 * melted +
+                 -3.2178882868487753 * RowTransitions +
+                 -9.348695305445199 * ColumnTransitions +
+                 -7.899265427351652 * NumberOfHoles +
+                 -3.3855972247263626 * WellSums)
+        return [score, self.moveX, self.moveY, self.shape_num,
+                (self.count, lh, s["height"], LandingHeight, melted, RowTransitions,
+                 ColumnTransitions, NumberOfHoles, WellSums)]
+
     def solve(self):
-        x = -2
+        x = 0
         y = 0
         idx = 0
+        t = T[self.tetris_num]
         possible = []
-        for x in range(-2, self.width, 1):
-            for idx in range(4):
+        for x in range(self.width):
+            for idx in range(len(t)):
+                # print("len of shape", len(t), idx)
                 if self.collision(x, y, idx):  # 放不下
                     continue
                 self.moveX = x
@@ -259,21 +348,28 @@ class TetrisModel():
                 # print("x {} y {} i {}".format(x, self.moveY, idx))
                 possible.append([x, self.moveY, idx])
         self.moveY = 0  # 恢复位置
+        # print(possible)
 
         answer = [-1000000, ]
         for xyz in possible:
             x = xyz[0]
             y = xyz[1]
             idx = xyz[2]
-
             # t = copy.deepcopy(self)
             t = pickle.loads(pickle.dumps(self, -1))
             t.moveX = x
             t.moveY = y
             t.shape_num = idx
             t.save()
-            # r = t.evaluate5()  # 评价函数
-            r = t.PierreDellacherie()
+            r = t.evaluate()
+
+            # g = copy.deepcopy(self.grid)
+            # s = T[self.tetris_num][idx]
+            # for h in range(s["height"]):
+            #     g[h + y] = g[h + y] | (s["shape"][h] << x)
+            # r = self.evaluate(g)
+
+            # print(r)
             if r[0] > answer[0]:
                 answer = r
         return answer
@@ -364,11 +460,11 @@ class GameController():
         self.nextX = self._model.width + 1
         self.nextY = 1
         self.start = datetime.now()
-        self.new_tetris()
         self.dt = ""
+        self.new_tetris()
         if self.ai:
             global DELAY
-            DELAY = 3
+            DELAY = 1
 
     def update(self, save=False):
         if save:
@@ -429,12 +525,6 @@ class GameController():
                     self._model.save()
                     self.try_melt()
                     self.new_tetris()
-                    if self.ai:  # 自动执行
-                        answer = self._model.solve()  # 尝试解题
-                        self._model.moveX = answer[1]
-                        self._model.shape_num = answer[3]
-                        print(self.dt, "score:", self.score,
-                              self._model.tetris_num, answer)
 
             self._view.after(DELAY, self.on_timer)
         else:
@@ -448,17 +538,29 @@ class GameController():
                                 T[self._model.tetris_num][self._model.shape_num], "move")
         self._view.redraw_shape(self.nextX, self.nextY, self.next_color,
                                 T[self._model.next_tetris][0], "next")
+        if self.ai:  # 自动执行
+            answer = self._model.solve()  # 尝试解题
+            self._model.moveX = answer[1]
+            self._model.shape_num = answer[3]
+            print(self.dt, "score:", self.score,
+                  self._model.tetris_num, answer)
 
     def try_melt(self):
-        i = GRID_HEIGHT-1
-        while i > 0:
-            if self._model.melt_detect(i):
-                print("try_melt", i, self._model.grid[i])
-                self._model.melt_it(i)
-                self._view.melt_tile(i)
-                self.score += 1
-                i += 1
-            i -= 1
+        melted = self._model.try_melt()
+        for h in melted:
+            self._view.melt_tile(h)
+
+        # h = GRID_HEIGHT-1
+        # while h > 0:
+        #     if 1 << self._model.width <= self._model.grid[h] + 1:
+        #         print("try_melt", h, self._model.grid[h])
+        #         # self._model.melt_it(h)
+        #         for y in range(h, 0, -1):
+        #             self._model.grid[y] = self._model.grid[y - 1]
+        #         self._view.melt_tile(h)
+        #         self.score += 1
+        #         h += 1
+        #     h -= 1
 
     def game_over(self):
         self._model.in_game = False
@@ -497,13 +599,15 @@ def verify():
         m.moveY = answer[2]
         m.shape_num = answer[3]
         m.save()
-        i = GRID_HEIGHT-1
-        while i > 0:
-            if m.melt_detect(i):
-                m.melt_it(i)
-                score += 1
-                i += 1
-            i -= 1
+        melted = m.try_melt()
+        score += len(melted)
+
+        # i = GRID_HEIGHT-1
+        # while i > 0:
+        #     if m.melt_detect(i):
+        #         m.melt_it(i)
+        #         i += 1
+        #     i -= 1
         print(dt, "score:", score, m.tetris_num, answer)
 
 
