@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import random
-import copy
-import pickle
 import sys
 import os
 import getopt
@@ -74,7 +72,7 @@ class TetrisModel():
         self.moveY = 0
         self.shape_num = 0
         self.tetris_num = 0
-        self.next_tetris = 0
+        self.next_tetris = 5
         self.pause_move = False
 
     def new_tetris(self):
@@ -87,10 +85,10 @@ class TetrisModel():
         self.moveX = int(self.width / 2 - 1)
         self.moveY = 0
 
-    def collision(self, x: int, y: int, num=None):
+    def collided(self, x: int, y: int, num=None):
         if x < 0:
             return True
-        # print("collision:", self.tetris_num, x, y, num)
+        # print("collided:", self.tetris_num, x, y, num)
         if num is None:
             s = T[self.tetris_num][self.shape_num]
         else:
@@ -109,15 +107,15 @@ class TetrisModel():
     def move(self, d: Direction):
         ret = False
         if d == Direction.LEFT:
-            if not self.collision(self.moveX-1, self.moveY):
+            if not self.collided(self.moveX-1, self.moveY):
                 self.moveX -= 1
                 ret = True
         elif d == Direction.RIGTHT:
-            if not self.collision(self.moveX+1, self.moveY):
+            if not self.collided(self.moveX+1, self.moveY):
                 self.moveX += 1
                 ret = True
         elif d == Direction.DOWN:
-            if not self.collision(self.moveX, self.moveY+1):
+            if not self.collided(self.moveX, self.moveY+1):
                 self.moveY += 1
                 ret = True
         return ret
@@ -126,10 +124,10 @@ class TetrisModel():
         rotate = False
         s = T[self.tetris_num]
         if self.shape_num >= len(s) - 1:
-            if not self.collision(self.moveX, self.moveY, 0):
+            if not self.collided(self.moveX, self.moveY, 0):
                 self.shape_num = 0
                 rotate = True
-        elif not self.collision(self.moveX, self.moveY, self.shape_num+1):
+        elif not self.collided(self.moveX, self.moveY, self.shape_num+1):
             self.shape_num += 1
             rotate = True
         return rotate
@@ -200,7 +198,6 @@ class TetrisModel():
             mark = 0
             col_cells = 0
             wells = 0
-            well_height = 0
             last_cell = 0
             for y in range(self.height):
                 # column transtion
@@ -216,28 +213,28 @@ class TetrisModel():
                     if cell == 0 and (grid[y] >> 1 & 1) == 1:
                         wells += 1
                     elif wells > 0:
-                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        WellSums += (1+wells)*wells/2  # Gaussian quadrature
                         wells = 0
                     if y >= self.height-1:
-                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        WellSums += (1+wells)*wells/2  #
                         wells = 0
                 elif x == self.width - 1:
                     if cell == 0 and (grid[y] >> x-1 & 1) == 1:
                         wells += 1
                     elif wells > 0:
-                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        WellSums += (1+wells)*wells/2  #
                         wells = 0
                     if y >= self.height-1:
-                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        WellSums += (1+wells)*wells/2  #
                         wells = 0
                 else:
                     if cell == 0 and (grid[y] >> x-1 & 1) == 1 and (grid[y] >> x+1 & 1) == 1:
                         wells += 1
                     elif wells > 0:
-                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        WellSums += (1+wells)*wells/2  #
                         wells = 0
                     if y >= self.height-1:
-                        WellSums += (1+wells)*wells/2  # 高斯求和
+                        WellSums += (1+wells)*wells/2  #
                         wells = 0
 
                 if cell == 1:
@@ -265,7 +262,7 @@ class TetrisModel():
                 (self.count, lh, s["height"], LandingHeight, melted, RowTransitions,
                  ColumnTransitions, NumberOfHoles, WellSums)]
 
-    def solve(self):
+    def long_solve(self):
         x = 0
         y = 0
         idx = 0
@@ -274,7 +271,7 @@ class TetrisModel():
         for x in range(self.width):
             for idx in range(len(t)):
                 # print("len of shape", len(t), idx)
-                if self.collision(x, y, idx):  # 放不下
+                if self.collided(x, y, idx):  # 放不下
                     continue
                 self.moveX = x
                 self.moveY = y
@@ -292,7 +289,7 @@ class TetrisModel():
             y = xyz[1]
             idx = xyz[2]
 
-            # # t = copy.deepcopy(self)
+            # t = copy.deepcopy(self)
             # t = pickle.loads(pickle.dumps(self, -1))
             # t.moveX = x
             # t.moveY = y
@@ -300,9 +297,7 @@ class TetrisModel():
             # t.save()
             # r = t.evaluate()
 
-            g = []
-            for l in self.grid:
-                g.append(l)
+            g = self.grid.copy()
             s = T[self.tetris_num][idx]
             for h in range(s["height"]):
                 g[h + y] = g[h + y] | (s["shape"][h] << x)
@@ -310,6 +305,33 @@ class TetrisModel():
 
             if r[0] > answer[0]:
                 answer = r
+        return answer
+
+    def solve(self):
+        t = T[self.tetris_num]
+        answer = [-1000000, ]
+        for idx in range(len(t)):
+            s = t[idx]
+            for x in range(self.width-s["width"]+1):
+                y = 0
+                while y <= self.height - s["height"]:
+                    collided = False
+                    for h in range(s["height"]):
+                        if (s["shape"][h] << x) & self.grid[y+h] != 0:
+                            collided = True
+                    if not collided:
+                        y += 1
+                    else:
+                        break
+                y -= 1
+
+                g = [*self.grid]
+                for h in range(s["height"]):
+                    g[h + y] = g[h + y] | (s["shape"][h] << x)
+                r = self.evaluate(g, x, y, idx)
+                # print(r)
+                if r[0] > answer[0]:
+                    answer = r
         return answer
 
 
@@ -452,7 +474,6 @@ class GameController():
                 self.update()
 
     def on_timer(self):
-        pass
         if self._model.in_game:
             self.dt = str(datetime.now() - self.start).split(".")[0]
             if not self._model.pause_move:
@@ -513,7 +534,7 @@ def main(ai=False):
     root.mainloop()
 
 
-def verify():
+def verify(count=None):
     # 验证模式，无GUI界面动画
     score = 0
     start = datetime.now()
@@ -528,8 +549,11 @@ def verify():
         m.save()
         melted = m.try_melt()
         score += len(melted)
-        # if m.count % 100 == 0:
-        print(dt, "score:", score, answer)
+        if m.count % 100 == 0:
+            print(dt, "score:", score, answer)
+        if count and score >= count:
+            print(dt, "score:", score, answer)
+            break
 
 
 if __name__ == '__main__':
