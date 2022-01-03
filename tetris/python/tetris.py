@@ -22,25 +22,25 @@ GRID_LEFT = (BOARD_WIDTH-STEP*GRID_WIDTH)/2  # pixel
 
 
 T = []
-T.append([{"shape": [3, 3], "width": 2, "height": 2}])  # O
-T.append([{"shape": [3, 6], "width": 3, "height": 2},  # S
-          {"shape": [2, 3, 1], "width": 2, "height": 3}])
-T.append([{"shape": [6, 3], "width": 3, "height": 2},  # Z
-          {"shape": [1, 3, 2], "width": 2, "height": 3}])
-T.append([{"shape": [1, 1, 3], "width": 2, "height": 3},  # J
-          {"shape": [4, 7], "width": 3, "height": 2},
-          {"shape": [3, 2, 2], "width": 2, "height": 3},
-          {"shape": [7, 1], "width": 3, "height": 2}])
-T.append([{"shape": [2, 2, 3], "width": 2, "height": 3},  # L
-          {"shape": [1, 7], "width": 3, "height": 2},
-          {"shape": [3, 1, 1], "width": 2, "height": 3},
-          {"shape": [7, 4], "width": 3, "height": 2}])
+T.append([{"shape": [1, 1, 1, 1], "width": 1, "height": 4},  # I
+          {"shape": [15], "width": 4, "height": 1}])
 T.append([{"shape": [2, 7], "width": 3, "height": 2},  # T
           {"shape": [2, 3, 2], "width": 2, "height": 3},
           {"shape": [7, 2], "width": 3, "height": 2},
           {"shape": [1, 3, 1], "width": 2, "height": 3}])
-T.append([{"shape": [1, 1, 1, 1], "width": 1, "height": 4},  # I
-          {"shape": [15], "width": 4, "height": 1}])
+T.append([{"shape": [3, 3], "width": 2, "height": 2}])  # O
+T.append([{"shape": [2, 2, 3], "width": 2, "height": 3},  # L
+          {"shape": [1, 7], "width": 3, "height": 2},
+          {"shape": [3, 1, 1], "width": 2, "height": 3},
+          {"shape": [7, 4], "width": 3, "height": 2}])
+T.append([{"shape": [7, 1], "width": 3, "height": 2},  # J
+          {"shape": [1, 1, 3], "width": 2, "height": 3},
+          {"shape": [4, 7], "width": 3, "height": 2},
+          {"shape": [3, 2, 2], "width": 2, "height": 3}])
+T.append([{"shape": [6, 3], "width": 3, "height": 2},  # Z
+          {"shape": [1, 3, 2], "width": 2, "height": 3}])
+T.append([{"shape": [3, 6], "width": 3, "height": 2},  # S
+          {"shape": [2, 3, 1], "width": 2, "height": 3}])
 print("length of T:", len(T))
 
 COLORS = ["red", "lightblue", "green", "brown",
@@ -70,17 +70,20 @@ class TetrisModel():
         self.in_game = True
         self.moveX = 3
         self.moveY = 0
-        self.shape_num = 0
-        self.tetris_num = 0
+        # self.shape_num = 0
+        # self.tetris_num = 0
         self.next_tetris = 5
         self.pause_move = False
+        self.new_tetris()
 
     def new_tetris(self):
         self.count += 1
         self.tetris_num = self.next_tetris
         self.shape_num = 0
-        self.next_tetris = int.from_bytes(os.urandom(
-            4), byteorder='little', signed=False) % 7
+        # self.next_tetris = random.randint(0, 100) % 7
+        self.next_tetris = self.count % 7
+        # self.next_tetris = int.from_bytes(os.urandom(
+        #     4), byteorder='little', signed=False) % 7
         # self.next_tetris = 5
         self.moveX = int(self.width / 2 - 1)
         self.moveY = 0
@@ -323,13 +326,17 @@ class TetrisModel():
                         y += 1
                     else:
                         break
+
+                # while not self.collided(x, y, idx):
+                #     y += 1
+
                 y -= 1
 
                 g = [*self.grid]
                 for h in range(s["height"]):
                     g[h + y] = g[h + y] | (s["shape"][h] << x)
                 r = self.evaluate(g, x, y, idx)
-                # print(r)
+                print(r)
                 if r[0] > answer[0]:
                     answer = r
         return answer
@@ -422,9 +429,9 @@ class GameController():
         self.start = datetime.now()
         self.dt = "0:00:00"
         self.new_tetris()
-        if self.ai:
-            global DELAY
-            DELAY = 1
+        # if self.ai:
+        #     global DELAY
+        #     DELAY = 1
 
     def update(self, save=False):
         if save:
