@@ -80,10 +80,8 @@ class TetrisModel():
         self.count += 1
         self.tetris_num = self.next_tetris
         self.shape_num = 0
-        # self.next_tetris = random.randint(0, 100) % 7
-        self.next_tetris = self.count % 7
-        # self.next_tetris = int.from_bytes(os.urandom(
-        #     4), byteorder='little', signed=False) % 7
+        self.next_tetris = random.randint(0, 100) % 7
+        # self.next_tetris = self.count % 7
         # self.next_tetris = 5
         self.moveX = int(self.width / 2 - 1)
         self.moveY = 0
@@ -163,7 +161,7 @@ class TetrisModel():
                 # print("try_melt", h, grid[h])
                 melted.append(h)
                 for y in range(h, 0, -1):
-                    grid[y] = self.grid[y - 1]
+                    grid[y] = grid[y - 1]
                 h += +1
             h -= 1
         return melted
@@ -184,7 +182,17 @@ class TetrisModel():
         ColumnTransitions = 0
         NumberOfHoles = 0
         WellSums = 0
-        melted = len(self.try_melt(grid))
+
+        melted = 0
+        h = self.height - 1
+        while h > 0:
+            if 1 << self.width <= grid[h] + 1:
+                # print("try_melt", h, grid[h])
+                melted += 1
+                for y in range(h, 0, -1):
+                    grid[y] = grid[y - 1]
+                h += +1
+            h -= 1
 
         # column transtion
         for y in range(self.height):
@@ -265,51 +273,6 @@ class TetrisModel():
                 (self.count, lh, s["height"], LandingHeight, melted, RowTransitions,
                  ColumnTransitions, NumberOfHoles, WellSums)]
 
-    def long_solve(self):
-        x = 0
-        y = 0
-        idx = 0
-        t = T[self.tetris_num]
-        possible = []
-        for x in range(self.width):
-            for idx in range(len(t)):
-                # print("len of shape", len(t), idx)
-                if self.collided(x, y, idx):  # 放不下
-                    continue
-                self.moveX = x
-                self.moveY = y
-                self.shape_num = idx
-                while self.move(Direction.DOWN):
-                    pass
-                # print("x {} y {} i {}".format(x, self.moveY, idx))
-                possible.append([x, self.moveY, idx])
-        self.moveY = 0  # 恢复位置
-        # print(possible)
-
-        answer = [-1000000, ]
-        for xyz in possible:
-            x = xyz[0]
-            y = xyz[1]
-            idx = xyz[2]
-
-            # t = copy.deepcopy(self)
-            # t = pickle.loads(pickle.dumps(self, -1))
-            # t.moveX = x
-            # t.moveY = y
-            # t.shape_num = idx
-            # t.save()
-            # r = t.evaluate()
-
-            g = self.grid.copy()
-            s = T[self.tetris_num][idx]
-            for h in range(s["height"]):
-                g[h + y] = g[h + y] | (s["shape"][h] << x)
-            r = self.evaluate(g, x, y, idx)
-
-            if r[0] > answer[0]:
-                answer = r
-        return answer
-
     def solve(self):
         t = T[self.tetris_num]
         answer = [-1000000, ]
@@ -336,7 +299,7 @@ class TetrisModel():
                 for h in range(s["height"]):
                     g[h + y] = g[h + y] | (s["shape"][h] << x)
                 r = self.evaluate(g, x, y, idx)
-                print(r)
+                # print(r)
                 if r[0] > answer[0]:
                     answer = r
         return answer
@@ -429,9 +392,9 @@ class GameController():
         self.start = datetime.now()
         self.dt = "0:00:00"
         self.new_tetris()
-        # if self.ai:
-        #     global DELAY
-        #     DELAY = 1
+        if self.ai:
+            global DELAY
+            DELAY = 1
 
     def update(self, save=False):
         if save:
