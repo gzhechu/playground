@@ -13,6 +13,7 @@ STEP = 19  # pixel
 SIDE = 17  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
+AI_DELAY = 1  # micro second
 
 GRID_WIDTH = 10  # num
 GRID_HEIGHT = 20  #
@@ -30,9 +31,9 @@ T.append([{"shape": [2, 7], "width": 3, "height": 2},  # T
           {"shape": [1, 3, 1], "width": 2, "height": 3}])
 T.append([{"shape": [3, 3], "width": 2, "height": 2}])  # O
 T.append([{"shape": [2, 2, 3], "width": 2, "height": 3},  # L
-          {"shape": [1, 7], "width": 3, "height": 2},
+          {"shape": [7, 4], "width": 3, "height": 2},
           {"shape": [3, 1, 1], "width": 2, "height": 3},
-          {"shape": [7, 4], "width": 3, "height": 2}])
+          {"shape": [1, 7], "width": 3, "height": 2}])
 T.append([{"shape": [7, 1], "width": 3, "height": 2},  # J
           {"shape": [1, 1, 3], "width": 2, "height": 3},
           {"shape": [4, 7], "width": 3, "height": 2},
@@ -324,6 +325,8 @@ class GameView(Canvas):
         self.create_rectangle(GRID_LEFT, GRID_TOP, GRID_LEFT + GRID_WIDTH * STEP,
                               GRID_TOP + GRID_HEIGHT * STEP,
                               fill="#1f1f1f", width=0, tag="grid")
+        self.create_text(GRID_LEFT + SIDE*(GRID_WIDTH+1)//2, SIDE*10, text="",
+                         tag="hardcore", fill="red", font=("Arial", 6+STEP//2), justify='center')
         self.pack()
 
     def draw_tile(self, x, y, color, tag):
@@ -354,7 +357,7 @@ class GameView(Canvas):
             if c[1] < n*STEP+GRID_TOP:
                 self.move(tile, 0, STEP)
 
-    def draw_score(self, dt, s, x, y, t, i):
+    def draw_score(self, dt, s, x, y, t, i, h=False):
         tm = self.find_withtag("time")
         self.itemconfigure(tm, text=dt)
         score = self.find_withtag("score")
@@ -367,6 +370,25 @@ class GameView(Canvas):
         self.itemconfigure(ttt, text="T: {}".format(t))
         iii = self.find_withtag("iii")
         self.itemconfigure(iii, text="I: {}".format(i))
+        hardcore = self.find_withtag("hardcore")
+        if h:
+            self.itemconfigure(hardcore, text="HARDCORE MODE")
+        else:
+            self.itemconfigure(hardcore, text="")
+
+    def redraw_hardcore(self, color, m: TetrisModel):
+        tag = "move"
+        dots = self.find_withtag(tag)
+        for dot in dots:
+            self.delete(dot)
+        tag = "save"
+        dots = self.find_withtag(tag)
+        for dot in dots:
+            self.delete(dot)
+        for h in range(m.height):
+            for w in range(m.width):
+                if (m.grid[h] >> w) & 1:
+                    self.draw_tile(w, h, color, tag)
 
     def game_over(self, score):
         self.create_rectangle(STEP*5, self.winfo_height()/2-STEP*3,
@@ -384,6 +406,7 @@ class GameController():
         self._model = model
         self._view = view
         self.ai = ai
+        self.hardcore = False
         self.next_color = "lightblue"
         self.color = self.next_color
         self.score = 0
@@ -392,9 +415,6 @@ class GameController():
         self.start = datetime.now()
         self.dt = "0:00:00"
         self.new_tetris()
-        if self.ai:
-            global DELAY
-            DELAY = 1
 
     def update(self, save=False):
         if save:
@@ -405,6 +425,14 @@ class GameController():
                                     T[self._model.tetris_num][self._model.shape_num], "move")
         self._view.draw_score(self.dt, self.score, self._model.moveX,
                               self._model.moveY, self._model.tetris_num, self._model.shape_num)
+
+    def draw_hardcore(self):
+        self._view.redraw_hardcore("green2", self._model)
+        self.next_color = COLORS[random.randint(0, 100) % 8]
+        self._view.redraw_shape(self.nextX, self.nextY, self.next_color,
+                                T[self._model.next_tetris][0], "next")
+        self._view.draw_score(self.dt, self.score, self._model.moveX,
+                              self._model.moveY, self._model.tetris_num, self._model.shape_num, True)
 
     def on_key_pressed(self, e):
         if not self._model.in_game:
@@ -433,6 +461,14 @@ class GameController():
         if key in UP_CURSOR_KEY and self._model.rotate():
             self.update()
 
+        AI_KEY = ["a", "A"]
+        if key in AI_KEY:
+            self.ai = not self.ai
+
+        HARDCORE_KEY = ["h", "H"]
+        if key in HARDCORE_KEY:
+            self.hardcore = not self.hardcore
+
         ESCAPE_CURSOR_KEY = "Escape"
         if key == ESCAPE_CURSOR_KEY:
             # self.game_over()
@@ -444,7 +480,26 @@ class GameController():
                 self.update()
 
     def on_timer(self):
-        if self._model.in_game:
+        if self.hardcore:
+            self.draw_hardcore()
+            while self._model.in_game:
+                answer = self._model.solve()  # 尝试解题
+                self._model.moveX = answer[1]
+                self._model.moveY = answer[2]
+                self._model.shape_num = answer[3]
+                self._model.save()
+                melted = self._model.try_melt()
+                self.score += len(melted)
+                self._model.new_tetris()
+                if self._model.count % 100 == 0:
+                    self.dt = str(datetime.now() - self.start).split(".")[0]
+                    print(self.dt, "score:", self.score, answer)
+                    self._view.after(AI_DELAY, self.on_timer)
+                    break
+            if not self._model.in_game:
+                self.game_over()
+
+        elif self._model.in_game:
             self.dt = str(datetime.now() - self.start).split(".")[0]
             if not self._model.pause_move:
                 if self._model.move(Direction.DOWN):
@@ -454,8 +509,10 @@ class GameController():
                     self._model.save()
                     self.try_melt()
                     self.new_tetris()
-
-            self._view.after(DELAY, self.on_timer)
+            if self.ai:
+                self._view.after(AI_DELAY, self.on_timer)
+            else:
+                self._view.after(DELAY, self.on_timer)
         else:
             self.game_over()
 
