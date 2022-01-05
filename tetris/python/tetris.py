@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+#
+# to gain maxiam speed, try pypy3.
+# 
+
+import math
+import os
 import random
 import sys
 import getopt
@@ -80,13 +86,15 @@ class TetrisModel():
         self.count += 1
         self.tetris_idx = self.next_tetris
         self.shape_idx = 0
-        self.next_tetris = random.randint(0, 100) % 7
+        self.next_tetris = random.randint(0, 6)
+        # self.next_tetris = math.floor(random.SystemRandom().random() * 7)
+        # self.next_tetris = int.from_bytes(os.urandom(8), byteorder="big") % 7
         # self.next_tetris = self.count % 7
         # self.next_tetris = 5
         self.moveX = int(self.width / 2 - 1)
         self.moveY = 0
 
-    def collided(self, x: int, y: int, num=None):
+    def collided(self, x: int, y: int, num:int=None):
         if x < 0:
             return True
         # print("collided:", self.tetris_idx, x, y, num)
@@ -133,35 +141,25 @@ class TetrisModel():
             rotate = True
         return rotate
 
-    def save(self, grid=None, x=None, y=None, num=None):
-        # print("save", grid, x, y, num)
-        if not grid:
-            grid = self.grid
-        if not x:
-            x = self.moveX
-        if not y:
-            y = self.moveY
-        if not num:
-            num = self.shape_idx
-        s = T[self.tetris_idx][num]
+    def save(self):
+        x = self.moveX
+        y = self.moveY
+        s = T[self.tetris_idx][self.shape_idx]
         for h in range(s["height"]):
-            grid[h + y] = grid[h + y] | (s["shape"][h] << x)
+            self.grid[h + y] = self.grid[h + y] | (s["shape"][h] << x)
 
-        if grid[0] > 0:
+        if self.grid[0] > 0:
             self.in_game = False
-        return grid
 
-    def try_melt(self, grid=None):
-        if not grid:
-            grid = self.grid
+    def try_melt(self):
         melted = []
         h = self.height - 1
         while h > 0:
-            if 1 << self.width <= grid[h] + 1:
+            if 1 << self.width <= self.grid[h] + 1:
                 # print("try_melt", h, grid[h])
                 melted.append(h)
                 for y in range(h, 0, -1):
-                    grid[y] = grid[y - 1]
+                    self.grid[y] = self.grid[y - 1]
                 h += +1
             h -= 1
         return melted
@@ -406,17 +404,17 @@ class GameController():
     def update(self, save=False):
         s = T[self.model.tetris_idx][self.model.shape_idx]
         self.view.redraw_shape(self.model.moveX, self.model.moveY, self.color,
-                                s, "move", save)
+                               s, "move", save)
         self.view.draw_score(self.dt, self.score, self.model.moveX,
-                              self.model.moveY, self.model.tetris_idx, self.model.shape_idx)
+                             self.model.moveY, self.model.tetris_idx, self.model.shape_idx)
 
     def draw_hardcore(self):
         self.view.redraw_hardcore("green2", self.model)
-        self.next_color = COLORS[random.randint(0, 100) % 8]
+        self.next_color = COLORS[random.randint(0, 7)]
         self.view.redraw_shape(self.nextX, self.nextY, self.next_color,
-                                T[self.model.next_tetris][0], "next")
+                               T[self.model.next_tetris][0], "next")
         self.view.draw_score(self.dt, self.score, self.model.moveX,
-                              self.model.moveY, self.model.tetris_idx, self.model.shape_idx, True)
+                             self.model.moveY, self.model.tetris_idx, self.model.shape_idx, True)
 
     def on_key_pressed(self, e):
         if not self.model.in_game:
@@ -502,12 +500,12 @@ class GameController():
 
     def new_tetris(self):
         self.color = self.next_color
-        self.next_color = COLORS[random.randint(0, 100) % 8]
+        self.next_color = COLORS[random.randint(0, 7)]
         self.model.new_tetris()
         self.view.redraw_shape(self.model.moveX, self.model.moveY, self.color,
-                                T[self.model.tetris_idx][self.model.shape_idx], "move")
+                               T[self.model.tetris_idx][self.model.shape_idx], "move")
         self.view.redraw_shape(self.nextX, self.nextY, self.next_color,
-                                T[self.model.next_tetris][0], "next")
+                               T[self.model.next_tetris][0], "next")
         if self.ai:  # 自动执行
             answer = self.model.solve()  # 尝试解题
             self.model.moveX = answer[1]
