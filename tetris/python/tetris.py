@@ -3,7 +3,7 @@
 
 #
 # to gain maxiam speed, try pypy3.
-# 
+#
 
 import math
 import os
@@ -14,8 +14,8 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas
 
-STEP = 19  # pixel
-SIDE = 17  #
+STEP = 9  # pixel
+SIDE = 8  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
 AI_DELAY = 1  # micro second
@@ -59,6 +59,23 @@ class Direction(Enum):
     DOWN = 3
 
 
+class TetrisRandom(object):
+    def __init__(self):
+        self.pool = []
+
+    @classmethod
+    def instance(cls, *args, **kwargs):
+        if not hasattr(TetrisRandom, "_instance"):
+            TetrisRandom._instance = TetrisRandom(*args, **kwargs)
+        return TetrisRandom._instance
+
+    def next(self):
+        if len(self.pool) <= 0:
+            self.pool = [* range(7)] * 7
+            random.shuffle(self.pool)
+        return self.pool.pop()
+
+
 class TetrisModel():
     def __init__(self, w: int, h: int):
         # print(w, h)
@@ -86,15 +103,16 @@ class TetrisModel():
         self.count += 1
         self.tetris_idx = self.next_tetris
         self.shape_idx = 0
-        self.next_tetris = random.randint(0, 6)
+        # self.next_tetris = random.randint(0, 6)
         # self.next_tetris = math.floor(random.SystemRandom().random() * 7)
         # self.next_tetris = int.from_bytes(os.urandom(8), byteorder="big") % 7
         # self.next_tetris = self.count % 7
         # self.next_tetris = 5
+        self.next_tetris = TetrisRandom.instance().next()
         self.moveX = int(self.width / 2 - 1)
         self.moveY = 0
 
-    def collided(self, x: int, y: int, num:int=None):
+    def collided(self, x: int, y: int, num: int = None):
         if x < 0:
             return True
         # print("collided:", self.tetris_idx, x, y, num)
@@ -473,7 +491,7 @@ class GameController():
                 melted = self.model.try_melt()
                 self.score += len(melted)
                 self.model.new_tetris()
-                if self.model.count % 100 == 0:
+                if self.model.count % 5000 == 0:
                     self.dt = str(datetime.now() - self.start).split(".")[0]
                     print(self.dt, "score:", self.score, answer)
                     self.view.after(AI_DELAY, self.on_timer)
@@ -558,7 +576,7 @@ def verify(count=None):
         m.save()
         melted = m.try_melt()
         score += len(melted)
-        if m.count % 100 == 0:
+        if m.count % 5000 == 0:
             print(dt, "score:", score, answer)
         if count and score >= count:
             print(dt, "score:", score, answer)
