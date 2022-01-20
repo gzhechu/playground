@@ -14,8 +14,8 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas
 
-STEP = 9  # pixel
-SIDE = 8  #
+STEP = 19  # pixel
+SIDE = 17  #
 BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
 DELAY = 300  # micro second
 AI_DELAY = 1  # micro second
