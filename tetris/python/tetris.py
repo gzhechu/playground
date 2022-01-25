@@ -6,7 +6,7 @@
 #
 
 import math
-import os
+import time
 import random
 import sys
 import getopt
@@ -14,16 +14,16 @@ from datetime import datetime
 from enum import Enum
 from tkinter import Tk, Frame, Canvas
 
-STEP = 19  # pixel
-SIDE = 17  #
-BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  #
+STEP = 19  # pixel, how many pixel each step moves.
+SIDE = 17  # pixel, side length of square
+BOARD_WIDTH = BOARD_HEIGHT = STEP * 24  # game window size
 DELAY = 300  # micro second
-AI_DELAY = 1  # micro second
+AI_DELAY = 5  # micro second
 
 GRID_WIDTH = 10  # num
 GRID_HEIGHT = 20  #
 
-GRID_TOP = STEP*2  # pixel
+GRID_TOP = STEP*2  # pixel, position of grid.
 GRID_LEFT = (BOARD_WIDTH-STEP*GRID_WIDTH)/2  # pixel
 
 
@@ -47,7 +47,7 @@ T.append([{"shape": [6, 3], "width": 3, "height": 2},  # Z
           {"shape": [1, 3, 2], "width": 2, "height": 3}])
 T.append([{"shape": [3, 6], "width": 3, "height": 2},  # S
           {"shape": [2, 3, 1], "width": 2, "height": 3}])
-print("length of T:", len(T))
+# print("length of T:", len(T))
 
 COLORS = ["red", "lightblue", "green", "brown",
           "yellow", "pink", "orange", "purple"]
@@ -55,7 +55,7 @@ COLORS = ["red", "lightblue", "green", "brown",
 
 class Direction(Enum):
     LEFT = 1
-    RIGTHT = 2
+    RIGHT = 2
     DOWN = 3
 
 
@@ -94,7 +94,6 @@ class TetrisModel():
         self.moveX = 3
         self.moveY = 0
         self.shape_idx = 0
-        # self.tetris_idx = 0
         self.next_tetris = 5
         self.pause_move = False
         self.new_tetris()
@@ -105,7 +104,6 @@ class TetrisModel():
         self.shape_idx = 0
         # self.next_tetris = random.randint(0, 6)
         # self.next_tetris = math.floor(random.SystemRandom().random() * 7)
-        # self.next_tetris = int.from_bytes(os.urandom(8), byteorder="big") % 7
         # self.next_tetris = self.count % 7
         # self.next_tetris = 5
         self.next_tetris = TetrisRandom.instance().next()
@@ -137,7 +135,7 @@ class TetrisModel():
             if not self.collided(self.moveX-1, self.moveY):
                 self.moveX -= 1
                 ret = True
-        elif d == Direction.RIGTHT:
+        elif d == Direction.RIGHT:
             if not self.collided(self.moveX+1, self.moveY):
                 self.moveX += 1
                 ret = True
@@ -183,7 +181,7 @@ class TetrisModel():
         return melted
 
     def evaluate(self, grid, try_x, try_y, try_num):
-        """ Impletment of Pierre Dellacherie  AI algorithm (El-Tetris) """
+        """ Impletment of Pierre Dellacherie's AI algorithm (El-Tetris) """
         LandingHeight = 0
         RowTransitions = 0
         ColumnTransitions = 0
@@ -439,49 +437,40 @@ class GameController():
             return
         key = e.keysym
         # print("pressed", key)
-
-        PAUSE_CURSOR_KEY = ["p", "P"]
-        if key in PAUSE_CURSOR_KEY:
-            self.model.pause_move = not self.model.pause_move
-            # print("pause_move", self.model.pause_move)
-
+        ESCAPE_KEY = "Escape"
+        AI_KEY = ["a", "A"]
+        HARDCORE_KEY = ["h", "H"]
+        PAUSE_KEY = ["p", "P"]
         LEFT_CURSOR_KEY = ["Left", "s", "S"]
+        RIGHT_CURSOR_KEY = ["Right", "f", "F"]
+        DOWN_CURSOR_KEY = ["Down", "d", "D"]
+        UP_CURSOR_KEY = ["Up", "j", "J", "e", "E"]
+        SPACE_KEY = "space"
+
+        if key in PAUSE_KEY:
+            self.model.pause_move = not self.model.pause_move
         if key in LEFT_CURSOR_KEY and self.model.move(Direction.LEFT):
             self.update()
-
-        RIGHT_CURSOR_KEY = ["Right", "f", "F"]
-        if key in RIGHT_CURSOR_KEY and self.model.move(Direction.RIGTHT):
+        if key in RIGHT_CURSOR_KEY and self.model.move(Direction.RIGHT):
             self.update()
-
-        DOWN_CURSOR_KEY = ["Down", "d", "D"]
         if key in DOWN_CURSOR_KEY and self.model.move(Direction.DOWN):
             self.update()
-
-        UP_CURSOR_KEY = ["Up", "j", "J", "e", "E"]
         if key in UP_CURSOR_KEY and self.model.rotate():
             self.update()
-
-        AI_KEY = ["a", "A"]
         if key in AI_KEY:
             self.ai = not self.ai
-
-        HARDCORE_KEY = ["h", "H"]
         if key in HARDCORE_KEY:
             self.hardcore = not self.hardcore
-
-        ESCAPE_CURSOR_KEY = "Escape"
-        if key == ESCAPE_CURSOR_KEY:
+        if key == ESCAPE_KEY:
             # self.game_over()
             sys.exit(0)
-
-        SPACE_CURSOR_KEY = "space"
-        if key == SPACE_CURSOR_KEY:
+        if key == SPACE_KEY:
             while self.model.move(Direction.DOWN):
                 self.update()
 
     def on_timer(self):
         if self.hardcore:
-            self.draw_hardcore()
+            ts = int(time.time())
             while self.model.in_game:
                 answer = self.model.solve()  # 尝试解题
                 self.model.moveX = answer[1]
@@ -491,9 +480,10 @@ class GameController():
                 melted = self.model.try_melt()
                 self.score += len(melted)
                 self.model.new_tetris()
-                if self.model.count % 5000 == 0:
+                if int(time.time()) != ts:
                     self.dt = str(datetime.now() - self.start).split(".")[0]
                     print(self.dt, "score:", self.score, answer)
+                    self.draw_hardcore()
                     self.view.after(AI_DELAY, self.on_timer)
                     break
             if not self.model.in_game:
@@ -545,13 +535,13 @@ class GameController():
 class TetrisGame(Frame):
     def __init__(self, ai=False):
         super().__init__()
-        self.master.title('TETRIS - 俄罗斯方块大作战')
-        m = TetrisModel(GRID_WIDTH, GRID_HEIGHT)
-        v = GameView()
-        c = GameController(m, v, ai)
-        v.bind_all("<Key>", c.on_key_pressed)
-        v.after(DELAY, c.on_timer)
-        self.board = v
+        self.master.title('TETRIS - 俄罗斯方块AI大作战')
+        model = TetrisModel(GRID_WIDTH, GRID_HEIGHT)
+        view = GameView()
+        controller = GameController(model, view, ai)
+        view.bind_all("<Key>", controller.on_key_pressed)
+        view.after(DELAY, controller.on_timer)
+        self.board = view
         self.pack()
 
 
