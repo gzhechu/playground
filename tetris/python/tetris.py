@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 #
-# to gain maxiam speed, try pypy3.
+# to gain maximum speed, try pypy3.
 #
 
 import math
