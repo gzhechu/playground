@@ -403,11 +403,11 @@ class GameView(Canvas):
 
 
 class GameController():
-    def __init__(self, model, view, ai=False):
+    def __init__(self, model, view, ai=False, hardcore=False):
         self.model = model
         self.view = view
         self.ai = ai
-        self.hardcore = False
+        self.hardcore = hardcore
         self.next_color = "lightblue"
         self.color = self.next_color
         self.score = 0
@@ -533,21 +533,21 @@ class GameController():
 
 
 class TetrisGame(Frame):
-    def __init__(self, ai=False):
+    def __init__(self, ai=False, hardcore=False):
         super().__init__()
         self.master.title('TETRIS - 俄罗斯方块AI大作战')
         model = TetrisModel(GRID_WIDTH, GRID_HEIGHT)
         view = GameView()
-        controller = GameController(model, view, ai)
+        controller = GameController(model, view, ai, hardcore)
         view.bind_all("<Key>", controller.on_key_pressed)
         view.after(DELAY, controller.on_timer)
         self.board = view
         self.pack()
 
 
-def main(ai=False):
+def main(ai=False, hardcore=False):
     root = Tk()
-    TetrisGame(ai)
+    TetrisGame(ai, hardcore)
     root.mainloop()
 
 
@@ -556,8 +556,8 @@ def verify(count=None):
     score = 0
     start = datetime.now()
     m = TetrisModel(GRID_WIDTH, GRID_HEIGHT)
+    ts = int(time.time())
     while m.in_game:
-        dt = str(datetime.now() - start).split(".")[0]
         m.new_tetris()
         answer = m.solve()  # 尝试解题
         m.moveX = answer[1]
@@ -566,21 +566,27 @@ def verify(count=None):
         m.save()
         melted = m.try_melt()
         score += len(melted)
-        if m.count % 5000 == 0:
+        if int(time.time()) != ts:
+            ts = int(time.time())
+            dt = str(datetime.now() - start).split(".")[0]
             print(dt, "score:", score, answer)
         if count and score >= count:
+            dt = str(datetime.now() - start).split(".")[0]
             print(dt, "score:", score, answer)
             break
 
 
 if __name__ == '__main__':
     opts, args = getopt.getopt(
-        sys.argv[1:], '-v-a', ['verify', 'auto'])
+        sys.argv[1:], '-v-a-h', ['verify', 'auto', 'hardcore'])
     for opt_name, opt_value in opts:
         if opt_name in ('-v', '--verify'):
             verify()
             sys.exit()
         if opt_name in ('-a', '--auto'):
             main(ai=True)
+            sys.exit()
+        if opt_name in ('-h', '--hardcore'):
+            main(ai=True, hardcore=True)
             sys.exit()
     main()
