@@ -10,7 +10,7 @@ $(function () {
             wait_interval = 1000 / parseInt($("#speed_slider").slider("value"));
             $("#speed").val(ui.value);
         },
-        value: 50,
+        value: 16,
     });
     $("#speed").val($("#speed_slider").slider("value"));
     wait_interval = 1000 / parseInt($("#speed_slider").slider("value"));
@@ -122,6 +122,30 @@ GameView.prototype.draw_shape = function (x, y, shape, color, clear) {
     }
 };
 
+GameView.prototype.redraw = function (model) {
+    // console.info("redraw", Date.now())
+    this.context.clearRect(0, 0, 300, 600);
+    this.drawGrid();
+    for (var h = 0; h < model.height; h++) {
+        for (var w = 0; w < model.width; w++) {
+            if (model.grid[h] >> w & 1) {
+                this.fill_cell(w, h, "#ff0000", false);
+            }
+        }
+    }
+};
+
+GameView.prototype.melt_tile = function (x, y, shape, color, clear) {
+    for (var h = 0; h < shape.height; h++) {
+        for (var w = 0; w < shape.width; w++) {
+            // console.info("shape cell: ", h, w, (shape.shape[h] >> w) & 1);
+            if (shape.shape[h] >> w & 1) {
+                this.fill_cell(x + w, y + h, color, clear);
+            }
+        }
+    }
+};
+
 var COLORS = new Array();
 var model = new TetrisModel(10, 20);
 var game_view = new GameView(10, 20, 30);
@@ -148,10 +172,12 @@ function debug() {
     setTimeout(on_timer, wait_interval);
 }
 
+var px = -100
+var py = -100
+var ps = undefined
 
 function update() {
-    console.info("update", Date.now())
-    // if (model.move(Direction.Down))
+    // console.info("update", Date.now())
     {
         previous = model.previous()
         px = previous.x
@@ -167,8 +193,7 @@ function update() {
 var start = new Date;
 
 function on_timer() {
-    console.info((new Date - start) / 1000 + " Seconds");
-
+    // console.info((new Date - start) / 1000 + " Seconds");
     if (model.in_game) {
         if (model.pause_move)
             return;
@@ -176,10 +201,10 @@ function on_timer() {
             this.update()
         }
         else {
-            // update(true)
             model.save()
-            try_melt()
-            new_tetris()
+            melted = model.try_melt()
+            game_view.redraw(model)
+            model.new_tetris()
         }
     }
     // else {
@@ -188,4 +213,31 @@ function on_timer() {
     setTimeout(on_timer, wait_interval);
 }
 
+function on_keypressed(event) {
+    console.info("on_keypress...", event)
+    const keyDown = ["KeyD", "ArrowDown"];
+    const keyLeft = ["KeyS", "ArrowLeft"];
+    const keyRight = ["KeyF", "ArrowRight"];
+    const keyRotate = ["KeyJ", "ArrowUp"];
+    if (keyLeft.includes(event.code)) {
+        console.info("left...")
+        if (model.move(Direction.Left))
+           this.update()
+    }
+    else if (keyRight.includes(event.code)) {
+        console.info("right...")
+        if (model.move(Direction.Right))
+           this.update()
+    }
+    else if (keyDown.includes(event.code)) {
+        console.info("down...")
+        if (model.move(Direction.Down))
+           this.update()
+    }
+    else if (keyRotate.includes(event.code)) {
+        console.info("rotate...")
+        if (model.rotate())
+            this.update()
+    }
+}
 

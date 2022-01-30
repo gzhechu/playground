@@ -59,7 +59,7 @@ TetrisModel.prototype.get_tetris = function () {
 
 TetrisModel.prototype.previous = function () {
     // console.info("previous", this.tetris_idx, this.shape_idx)
-    return { 'x': this.previous_x, 'y': this.previous_y, 'shape': T[this.tetris_idx][this.shape_idx] }
+    return { 'x': this.previous_x, 'y': this.previous_y, 'shape': T[this.tetris_idx][this.previous_idx] }
 };
 
 TetrisModel.prototype.new_tetris = function () {
@@ -67,6 +67,9 @@ TetrisModel.prototype.new_tetris = function () {
     this.tetris_idx = this.next_tetris
     this.shape_idx = 0
     this.next_tetris = Math.floor(Math.random() * T.length);
+    this.move_x = 3
+    this.move_y = 0
+    // console.info("new_tetris idx:", this.tetris_idx)
 };
 
 TetrisModel.prototype.collision_detect = function (x, y, idx) {
@@ -119,29 +122,36 @@ TetrisModel.prototype.move = function (val) {
     return ret
 };
 
-// # def try_melt(self):
-// #     melted = []
-// #     h = self.height - 1
-// #     while h > 0:
-// #         if 1 << self.width <= self.grid[h] + 1:
-// #             # print("try_melt", h, grid[h])
-// #             melted.append(h)
-// #             for y in range(h, 0, -1):
-// #                 self.grid[y] = self.grid[y - 1]
-// #             h += +1
-// #         h -= 1
-// #     return melted
+TetrisModel.prototype.rotate = function (val) {
+    rotate = false
+    this.previous_x = this.move_x
+    this.previous_y = this.move_y
+    s = T[this.tetris_idx]
+    if (this.shape_idx >= s.length - 1)
+        if (!this.collision_detect(this.move_x, this.move_y, 0)) {
+            this.shape_idx = 0
+            rotate = true
+        }
+        else if (!this.collided(this.moveX, this.moveY, this.shape_idx + 1)) {
+            this.shape_idx += 1
+            rotate = True
+        }
+    return rotate
+}
 
 TetrisModel.prototype.try_melt = function () {
+    console.info("try_melt ... ")
     melted = []
-    h = self.height - 1
+    h = this.height - 1
     while (h > 0) {
-        if (1 << self.width <= self.grid[h] + 1) {
+        if (1 << this.width <= this.grid[h] + 1) {
             // # print("try_melt", h, grid[h])
-            melted.append(h)
-            for y in range(h, 0, -1):
-                self.grid[y] = self.grid[y - 1]
-            h += +1
+            console.info("try_melt ... ", h, this.grid[h])
+            melted.push(h)
+            for (var y = h; y > 0; y--) {
+                this.grid[y] = this.grid[y - 1]
+            }
+            h += 1
         }
         h -= 1
     }
@@ -155,6 +165,7 @@ TetrisModel.prototype.save = function () {
     for (var h = 0; h < s.height; h++) {
         this.grid[h + y] = this.grid[h + y] | (s.shape[h] << x)
     }
+    console.info("save", this.grid)
     if (this.grid[0] > 0)
         this.in_game = false
 };
